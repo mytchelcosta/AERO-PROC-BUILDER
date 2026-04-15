@@ -543,40 +543,6 @@ const formatSpd = (spd) => {
     return trimmed;
 };
 
-// ─── Simulated Traffic Generator Fallback ───
-const getSimulatedTraffic = () => {
-    const t = Date.now() / 1000;
-    const cycle = 900; // 15 mins to fly in sequence
-    
-    // 4 mock airplanes flying realistic approach vectors towards VHHH
-    const planes = [
-        { callsign: 'CPA882', latStart: 21.60, lonStart: 114.70, latEnd: 22.31, lonEnd: 113.91, altStart: 22000, altEnd: 1500, spd: 380, offset: 0 },
-        { callsign: 'HKG118', latStart: 22.90, lonStart: 114.20, latEnd: 22.31, lonEnd: 113.91, altStart: 18000, altEnd: 2000, spd: 320, offset: 250 },
-        { callsign: 'CSZ992', latStart: 22.00, lonStart: 113.20, latEnd: 22.31, lonEnd: 113.91, altStart: 15000, altEnd: 3000, spd: 290, offset: 500 },
-        { callsign: 'UAL89',  latStart: 21.20, lonStart: 114.00, latEnd: 22.31, lonEnd: 113.91, altStart: 28000, altEnd: 4000, spd: 410, offset: 700 }
-    ];
-
-    return planes.map((p, i) => {
-        const tMod = (t + p.offset) % cycle;
-        const progress = tMod / cycle; // 0 to 1
-        
-        const lat = p.latStart + (p.latEnd - p.latStart) * progress;
-        const lon = p.lonStart + (p.lonEnd - p.lonStart) * progress;
-        const altFt = Math.max(0, Math.round(p.altStart + (p.altEnd - p.altStart) * progress));
-        const spdKts = Math.max(140, Math.round(p.spd - (p.spd - 140) * progress));
-        
-        const latDiff = p.latEnd - p.latStart;
-        const lonDiff = p.lonEnd - p.lonStart;
-        let hdg = Math.atan2(lonDiff, latDiff) * (180 / Math.PI);
-        if (hdg < 0) hdg += 360;
-
-        return {
-            icao: `sim${i}`, callsign: p.callsign,
-            lat, lon, altFt, hdg: Math.round(hdg), spdKts, isSim: true
-        };
-    });
-};
-
 
 const App = () => {
     const [db, setDb] = useState(INITIAL_DB);
@@ -592,7 +558,7 @@ const App = () => {
     
     // Live Traffic State
     const [trafficData, setTrafficData] = useState([]);
-    const [useSimulated, setUseSimulated] = useState(false);
+    const [trafficError, setTrafficError] = useState('');
 
     const [newFixName, setNewFixName] = useState('');
     const [newFixLat, setNewFixLat] = useState('');
@@ -642,23 +608,17 @@ const App = () => {
         mapRef.current = map;
     }, []);
 
-    // ── OpenSky Live Traffic Fetcher / Fallback Simulator ───────────────────
+    // ── OpenSky Live Traffic Fetcher ────────────────────────────────────────
     useEffect(() => {
         if (!dispOpts.liveTraffic) {
             setTrafficData([]);
-            setUseSimulated(false);
+            setTrafficError('');
             return;
         }
 
         let isSubscribed = true;
 
         const fetchTraffic = async () => {
-            // If API previously failed, bypass and push simulated data for the demo
-            if (useSimulated) {
-                if (isSubscribed) setTrafficData(getSimulatedTraffic());
-                return;
-            }
-
             try {
                 const targetUrl = 'https://opensky-network.org/api/states/all?lamin=21.0&lomin=112.5&lamax=23.5&lomax=115.5';
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
@@ -677,34 +637,35 @@ const App = () => {
                         icao: s[0], callsign: s[1] ? s[1].trim() : 'UNKNOWN',
                         lon: s[5], lat: s[6],
                         altFt: s[7] ? Math.round(s[7] * 3.28084) : 0, 
-                        hdg: s[10] || 0, spdKts: s[9] ? Math.round(s[9] * 1.94384) : 0,
-                        isSim: false
+                        hdg: s[10] || 0, spdKts: s[9] ? Math.round(s[9] * 1.94384) : 0
                     })).filter(a => a.lat && a.lon); 
                     
-                    if (isSubscribed) setTrafficData(parsed);
+                    if (isSubscribed) {
+                        setTrafficData(parsed);
+                        setTrafficError('');
+                    }
                 } else {
                     throw new Error('No states');
                 }
             } catch (e) {
-                console.warn("Live Traffic API fetch failed (likely Sandbox CORS or Rate Limit). Falling back to Simulation Mode so you can still view the feature!");
+                console.warn("Live Traffic API fetch failed.", e.message);
                 if (isSubscribed) {
-                    setUseSimulated(true);
-                    setTrafficData(getSimulatedTraffic());
+                    setTrafficData([]);
+                    setTrafficError('Live traffic unavailable (API rate limited or blocked).');
                 }
             }
         };
 
         fetchTraffic();
-        // If simulated, update every 2s for smooth motion. If live, update every 15s to save API rate limit.
-        const intervalTime = useSimulated ? 2000 : 15000;
-        const interval = setInterval(fetchTraffic, intervalTime); 
+        // 15s to safely respect OpenSky API rate limits
+        const interval = setInterval(fetchTraffic, 15000); 
         return () => {
             isSubscribed = false;
             clearInterval(interval);
         }
-    }, [dispOpts.liveTraffic, useSimulated]);
+    }, [dispOpts.liveTraffic]);
 
-    // ── Draw Live/Simulated Traffic ─────────────────────────────────────────
+    // ── Draw Live Traffic ─────────────────────────────────────────
     useEffect(() => {
         const fg = fgRef.current;
         if (!fg.map || !fg.trafficLg) return;
@@ -719,7 +680,7 @@ const App = () => {
                 const icon = L.divIcon({ className: 'traffic-icon', html: svg, iconSize: [18,18], iconAnchor: [9,9] });
                 
                 const labelHtml = `<div style="display:flex; flex-direction:column; line-height:1.2;">
-                    <span style="font-size:${textSize}px;">${plane.callsign} ${plane.isSim ? '<span style="color:var(--accent-red); font-size:0.8em; margin-left:2px;">(SIM)</span>' : ''}</span>
+                    <span style="font-size:${textSize}px;">${plane.callsign}</span>
                     <span style="font-size:${Math.max(8, textSize - 2)}px; color:var(--text-primary); font-weight:normal;">${plane.altFt} FT | ${plane.spdKts} KT</span>
                 </div>`;
 
@@ -1350,6 +1311,12 @@ const App = () => {
                     <button className={`toggle-btn ${dispOpts.tma ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, tma: !p.tma}))}>TMA</button>
                     <button className={`toggle-btn ${dispOpts.fir ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, fir: !p.fir}))}>FIR</button>
                 </div>
+                
+                {dispOpts.liveTraffic && trafficError && (
+                    <div style={{ padding: '8px 12px', background: 'rgba(248, 81, 73, 0.1)', borderBottom: '1px solid rgba(248, 81, 73, 0.2)', color: 'var(--accent-red)', fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                        ⚠️ {trafficError}
+                    </div>
+                )}
 
                 <div className="sidebar-body">
                     <div className="db-controls">
