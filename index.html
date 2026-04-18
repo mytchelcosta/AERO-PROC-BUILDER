@@ -17,51 +17,60 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --bg-card: #1c2128;
-            --border: #30363d;
-            --border-bright: #484f58;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --text-muted: #6e7681;
-            
-            /* Color Coding */
-            --color-sid: #388bfd;       /* Blue */
-            --color-sid-dim: rgba(56, 139, 253, 0.2);
-            --glow-sid: 0 0 12px rgba(56, 139, 253, 0.4);
-            
-            --color-star: #d29922;      /* Yellow */
-            --color-star-dim: rgba(210, 153, 34, 0.2);
-            --glow-star: 0 0 12px rgba(210, 153, 34, 0.4);
+            --bg-primary: #0a0e14;
+            --bg-secondary: #11161d;
+            --bg-tertiary: #1a2029;
+            --bg-card: #151b23;
+            --bg-elevated: #1f2730;
+            --border: #262d38;
+            --border-bright: #3b4553;
+            --text-primary: #eaf0f7;
+            --text-secondary: #96a1b0;
+            --text-muted: #626d7c;
 
-            --color-iac: #3fb950;       /* Green */
-            --color-iac-dim: rgba(63, 185, 80, 0.2);
-            --glow-iac: 0 0 12px rgba(63, 185, 80, 0.4);
+            /* Aviation-inspired color coding */
+            --color-sid: #3b9eff;       /* Departure — sky blue */
+            --color-sid-dim: rgba(59, 158, 255, 0.18);
+            --glow-sid: 0 0 14px rgba(59, 158, 255, 0.45);
 
-            --accent-red: #f85149;
+            --color-star: #ffb547;      /* Arrival — amber */
+            --color-star-dim: rgba(255, 181, 71, 0.18);
+            --glow-star: 0 0 14px rgba(255, 181, 71, 0.45);
+
+            --color-iac: #4ddb8d;       /* Approach — runway green */
+            --color-iac-dim: rgba(77, 219, 141, 0.18);
+            --glow-iac: 0 0 14px rgba(77, 219, 141, 0.45);
+
+            --accent-red: #ff5c68;
+            --accent-cyan: #4cd9e6;
+            --accent-purple: #c77dff;
+
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.4);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+
+            --sidebar-width: 340px;
         }
 
-        html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-primary); font-family: 'Inter', sans-serif; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-primary); font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         #root { width: 100%; height: 100%; display: flex; }
-        .leaflet-container { background: #111820 !important; }
-        
-        /* Remove default browser focus rings on map lines/elements */
+        .leaflet-container { background: #0b1017 !important; }
         .leaflet-container *:focus { outline: none !important; }
+
+        button { -webkit-tap-highlight-color: transparent; }
 
         /* ── Sidebar ── */
         .sidebar {
-            width: 340px;
-            min-width: 340px;
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
             height: 100%;
-            background: var(--bg-primary);
+            background: linear-gradient(180deg, var(--bg-primary) 0%, #0c1119 100%);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             z-index: 1000;
             overflow: hidden;
-            transition: width 0.3s ease, min-width 0.3s ease;
+            transition: width 0.3s cubic-bezier(.2,.8,.2,1), min-width 0.3s cubic-bezier(.2,.8,.2,1), transform 0.3s cubic-bezier(.2,.8,.2,1);
         }
         .sidebar.closed {
             width: 0;
@@ -70,131 +79,349 @@
         }
 
         .sidebar-header {
-            padding: 18px 16px 14px;
+            padding: 16px 16px 12px;
             border-bottom: 1px solid var(--border);
-            background: var(--bg-secondary);
+            background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
         }
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .header-logo {
+            width: 30px; height: 30px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--color-sid), var(--accent-purple));
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+        .header-title { font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; }
+        .header-sub { font-size: 10px; color: var(--text-muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
 
-        .header-title { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-        .header-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+        .header-close-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+            width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+            display: none; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .header-close-btn:hover, .header-close-btn:active { background: var(--bg-tertiary); color: var(--text-primary); }
 
         /* Tabs */
-        .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
+        .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--bg-secondary); position: relative; }
         .tab-btn {
-            flex: 1; padding: 10px; background: transparent; border: none; color: var(--text-secondary);
-            font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; border-bottom: 2px solid transparent;
+            flex: 1; padding: 11px 8px; background: transparent; border: none; color: var(--text-secondary);
+            font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; border-bottom: 2px solid transparent;
+            letter-spacing: 0.04em; text-transform: uppercase;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
         }
         .tab-btn:hover { color: var(--text-primary); background: var(--bg-tertiary); }
-        .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--color-sid); }
+        .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--color-sid); background: var(--bg-tertiary); }
+        .tab-btn svg { width: 13px; height: 13px; }
 
-        .sidebar-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+        .sidebar-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
         .sidebar-body::-webkit-scrollbar { width: 6px; }
         .sidebar-body::-webkit-scrollbar-track { background: transparent; }
         .sidebar-body::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
 
         /* DB Controls */
-        .db-controls { display: flex; gap: 8px; margin-bottom: 8px; }
+        .db-controls { display: flex; gap: 8px; }
         .btn-action {
-            flex: 1; padding: 8px; border-radius: 5px; border: 1px solid var(--border);
+            flex: 1; padding: 9px; border-radius: 7px; border: 1px solid var(--border);
             background: var(--bg-tertiary); color: var(--text-primary); font-size: 11px; font-weight: 600;
             cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;
         }
-        .btn-action:hover { border-color: var(--border-bright); background: var(--border); }
-        
+        .btn-action:hover, .btn-action:active { border-color: var(--border-bright); background: var(--bg-elevated); transform: translateY(-1px); }
+
         /* ── Section headers ── */
-        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 0 2px; }
-        .section-label { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; }
-        
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 6px; padding: 0 2px; cursor: pointer; user-select: none;
+        }
+        .section-label { display: flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; }
+        .section-count { font-size: 9px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
         .section-label.sids  { color: var(--color-sid); }
         .section-label.stars { color: var(--color-star); }
         .section-label.iacs  { color: var(--color-iac); }
 
         .section-dot { width: 7px; height: 7px; border-radius: 50%; }
-        .sids .section-dot  { background: var(--color-sid); }
-        .stars .section-dot { background: var(--color-star); }
-        .iacs .section-dot  { background: var(--color-iac); }
+        .sids .section-dot  { background: var(--color-sid); box-shadow: var(--glow-sid); }
+        .stars .section-dot { background: var(--color-star); box-shadow: var(--glow-star); }
+        .iacs .section-dot  { background: var(--color-iac); box-shadow: var(--glow-iac); }
+
+        .section-chevron { transition: transform 0.25s; color: var(--text-muted); }
+        .section-chevron.collapsed { transform: rotate(-90deg); }
 
         /* ── Procedure buttons ── */
-        .proc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+        .proc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .proc-btn {
-            position: relative; padding: 8px 10px; border-radius: 5px; border: 1px solid var(--border);
+            position: relative; padding: 9px 10px; border-radius: 7px; border: 1px solid var(--border);
             background: var(--bg-secondary); cursor: pointer; transition: all 0.15s ease; text-align: left; overflow: hidden;
+            min-height: 44px;
         }
-        .proc-btn:hover { border-color: var(--border-bright); background: var(--bg-tertiary); }
-        
+        .proc-btn:hover { border-color: var(--border-bright); background: var(--bg-tertiary); transform: translateY(-1px); }
+        .proc-btn:active { transform: translateY(0); }
+
         .proc-btn.active.sid  { background: var(--color-sid-dim); border-color: var(--color-sid); box-shadow: var(--glow-sid); }
         .proc-btn.active.star { background: var(--color-star-dim); border-color: var(--color-star); box-shadow: var(--glow-star); }
         .proc-btn.active.iac  { background: var(--color-iac-dim); border-color: var(--color-iac); box-shadow: var(--glow-iac); }
+
+        .proc-btn.dimmed { opacity: 0.3; filter: grayscale(0.5); }
+        .proc-btn.match { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(76, 217, 230, 0.3); }
 
         .proc-btn-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text-primary); display: block; }
         .proc-btn.active.sid .proc-btn-name  { color: var(--color-sid); }
         .proc-btn.active.star .proc-btn-name { color: var(--color-star); }
         .proc-btn.active.iac .proc-btn-name  { color: var(--color-iac); }
 
-        .proc-btn-type { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); display: block; margin-top: 1px; }
+        .proc-btn-type { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); display: block; margin-top: 2px; }
 
         .proc-btn-indicator {
             position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 5px; height: 5px; border-radius: 50%; opacity: 0; transition: 0.15s;
         }
         .proc-btn.active .proc-btn-indicator { opacity: 1; }
-        .proc-btn.active.sid .proc-btn-indicator  { background: var(--color-sid); }
-        .proc-btn.active.star .proc-btn-indicator { background: var(--color-star); }
-        .proc-btn.active.iac .proc-btn-indicator  { background: var(--color-iac); }
+        .proc-btn.active.sid .proc-btn-indicator  { background: var(--color-sid); box-shadow: var(--glow-sid); }
+        .proc-btn.active.star .proc-btn-indicator { background: var(--color-star); box-shadow: var(--glow-star); }
+        .proc-btn.active.iac .proc-btn-indicator  { background: var(--color-iac); box-shadow: var(--glow-iac); }
 
-        .empty-msg { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: center; padding: 8px; background: var(--bg-tertiary); border-radius: 4px; grid-column: span 2; }
+        .empty-msg { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: center; padding: 10px; background: var(--bg-tertiary); border-radius: 6px; grid-column: span 2; }
 
         /* Forms */
-        .form-group { margin-bottom: 12px; }
-        .form-label { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
-        .form-input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-        .form-input:focus { outline: none; border-color: var(--color-sid); }
+        .form-group { margin-bottom: 10px; }
+        .form-label { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+        .form-input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 9px 10px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; transition: 0.15s; }
+        .form-input:focus { outline: none; border-color: var(--color-sid); box-shadow: 0 0 0 3px rgba(59, 158, 255, 0.15); }
         .form-row { display: flex; gap: 8px; }
         .form-row > * { flex: 1; }
-        .add-btn { width: 100%; padding: 8px; background: var(--color-sid); color: #fff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 11px; transition: 0.2s; }
-        .add-btn:hover { background: #297be6; }
+        .add-btn {
+            width: 100%; padding: 10px; background: linear-gradient(180deg, var(--color-sid), #2b85e8);
+            color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 11px;
+            transition: 0.2s; letter-spacing: 0.03em;
+        }
+        .add-btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); box-shadow: var(--glow-sid); }
+        .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .item-list { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; max-height: 150px; overflow-y: auto; }
-        .item-row { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); align-items: center;}
+        .item-list { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; max-height: 180px; overflow-y: auto; }
+        .item-list::-webkit-scrollbar { width: 4px; }
+        .item-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+        .item-row { display: flex; justify-content: space-between; padding: 7px 9px; border-bottom: 1px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); align-items: center; }
         .item-row:last-child { border-bottom: none; }
-        .item-del { color: var(--accent-red); cursor: pointer; background: none; border: none; font-size: 14px; }
+        .item-row:hover { background: var(--bg-tertiary); }
+        .item-del { color: var(--accent-red); cursor: pointer; background: none; border: none; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
+        .item-del:hover { background: rgba(255, 92, 104, 0.15); }
 
         /* ── Detail panel ── */
-        .detail-panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+        .detail-panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; }
         .detail-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; }
         .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
         .detail-row:last-child { border-bottom: none; }
         .detail-key { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
         .detail-val { font-size: 11px; font-weight: 600; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
 
-        /* ── Display Settings Toggles ── */
-        .disp-settings-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px; background: var(--bg-primary); border-bottom: 1px solid var(--border); align-items: center; }
-        .toggle-btn { flex: 1; min-width: 60px; padding: 6px 0; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-size: 9px; font-weight: 700; font-family: 'JetBrains Mono', monospace; cursor: pointer; border-radius: 4px; transition: 0.2s; }
-        .toggle-btn:hover { border-color: var(--border-bright); }
-        .toggle-btn.active { background: var(--bg-tertiary); border-color: var(--color-sid); color: var(--text-primary); }
+        /* ── Collapsible Display Settings ── */
+        .settings-wrap {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        .settings-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px; cursor: pointer; user-select: none;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+            font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);
+        }
+        .settings-head:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+        .settings-body { padding: 4px 0 6px; }
 
-        .size-slider { flex: 1; margin: 0 8px; accent-color: var(--color-sid); }
-        
+        .disp-settings-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px 12px; align-items: center; }
+
+        .toggle-btn {
+            flex: 1; min-width: 54px; padding: 7px 0;
+            background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+            font-size: 9px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+            cursor: pointer; border-radius: 5px; transition: 0.2s; letter-spacing: 0.02em;
+        }
+        .toggle-btn:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+        .toggle-btn.active { background: var(--bg-elevated); border-color: var(--color-sid); color: var(--text-primary); box-shadow: 0 0 8px rgba(59, 158, 255, 0.15); }
+        .toggle-btn.active.iac-style { border-color: var(--color-iac); box-shadow: 0 0 8px rgba(77, 219, 141, 0.2); color: var(--color-iac); }
+        .toggle-btn.active.star-style { border-color: var(--color-star); color: var(--color-star); }
+
+        .size-slider { flex: 1; margin: 0 8px; accent-color: var(--color-sid); height: 4px; }
+
+        /* ── Search & Filter Bar ── */
+        .search-bar {
+            position: relative;
+            padding: 0;
+        }
+        .search-input {
+            width: 100%; background: var(--bg-primary); border: 1px solid var(--border);
+            color: var(--text-primary); padding: 9px 32px 9px 32px; border-radius: 7px;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; transition: 0.15s;
+        }
+        .search-input:focus { outline: none; border-color: var(--color-sid); box-shadow: 0 0 0 3px rgba(59, 158, 255, 0.15); }
+        .search-icon {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); pointer-events: none; width: 14px; height: 14px;
+        }
+        .search-clear {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            background: var(--bg-tertiary); border: none; color: var(--text-secondary);
+            width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .search-clear:hover { color: var(--accent-red); background: rgba(255, 92, 104, 0.15); }
+
+        /* ── Filter chips row ── */
+        .filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chip {
+            padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border);
+            background: var(--bg-secondary); color: var(--text-secondary);
+            font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+            cursor: pointer; transition: 0.2s; letter-spacing: 0.04em;
+        }
+        .chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
+        .chip.active { background: var(--color-sid-dim); border-color: var(--color-sid); color: var(--color-sid); }
+        .chip.accent { background: rgba(76, 217, 230, 0.12); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+        /* ── Highlight Fix indicator ── */
+        .highlight-banner {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-radius: 7px;
+            background: rgba(76, 217, 230, 0.1);
+            border: 1px solid rgba(76, 217, 230, 0.35);
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        }
+        .highlight-banner .banner-label { color: var(--text-muted); }
+        .highlight-banner .banner-value { color: var(--accent-cyan); font-weight: 700; flex: 1; }
+        .highlight-banner .banner-x {
+            background: transparent; border: none; color: var(--accent-cyan);
+            cursor: pointer; font-size: 14px; padding: 0 4px;
+        }
+
+        /* ── Stats card ── */
+        .stats-card {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+        }
+        .stat-cell { background: var(--bg-secondary); padding: 10px 8px; text-align: center; }
+        .stat-val { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+        .stat-key { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+        .stat-cell.danger .stat-val { color: var(--accent-red); }
+
+        /* ── Training mode ── */
+        .training-card {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .training-stat-row { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+        .training-score { color: var(--color-iac); font-weight: 700; }
+        .training-miss { color: var(--accent-red); font-weight: 700; }
+        .training-prompt {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+            text-align: center; color: var(--text-primary); padding: 14px;
+            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px;
+            letter-spacing: 0.02em;
+        }
+        .training-prompt .proc-badge {
+            display: inline-block; padding: 2px 8px; margin-left: 6px; border-radius: 4px;
+            font-size: 10px; background: var(--color-sid-dim); color: var(--color-sid);
+        }
+        .training-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .training-option {
+            padding: 10px; border: 1px solid var(--border); border-radius: 7px;
+            background: var(--bg-secondary); cursor: pointer; transition: 0.2s;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+            color: var(--text-primary); text-align: left;
+        }
+        .training-option:hover { border-color: var(--border-bright); background: var(--bg-tertiary); }
+        .training-option.correct { background: var(--color-iac-dim); border-color: var(--color-iac); color: var(--color-iac); box-shadow: var(--glow-iac); }
+        .training-option.wrong { background: rgba(255, 92, 104, 0.18); border-color: var(--accent-red); color: var(--accent-red); }
+        .training-option.revealed { opacity: 0.5; }
+        .training-mode-toggle { display: flex; gap: 4px; }
+
+        /* ── Mobile toggle button (map overlay) ── */
         #map { flex: 1; height: 100%; position: relative; }
 
         .sidebar-toggle {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 12px;
+            left: 12px;
             z-index: 1000;
-            background: var(--bg-secondary);
+            background: rgba(17, 22, 29, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border);
             color: var(--text-primary);
-            width: 32px;
-            height: 32px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 38px; height: 38px;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            box-shadow: var(--shadow-md);
             transition: 0.2s;
         }
-        .sidebar-toggle:hover { background: var(--bg-tertiary); border-color: var(--border-bright); }
+        .sidebar-toggle:hover, .sidebar-toggle:active { background: var(--bg-tertiary); border-color: var(--border-bright); }
+
+        .map-fab-stack {
+            position: absolute;
+            top: 60px;
+            left: 12px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .map-fab {
+            width: 38px; height: 38px; border-radius: 9px;
+            background: rgba(17, 22, 29, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s;
+            box-shadow: var(--shadow-md);
+        }
+        .map-fab:hover { color: var(--text-primary); border-color: var(--border-bright); }
+        .map-fab.active { color: var(--color-sid); border-color: var(--color-sid); box-shadow: var(--glow-sid); }
+
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 900;
+            backdrop-filter: blur(2px);
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+            :root { --sidebar-width: 88vw; }
+
+            .sidebar {
+                position: absolute;
+                top: 0; left: 0;
+                max-width: 380px;
+                box-shadow: var(--shadow-lg);
+            }
+            .sidebar.closed { transform: translateX(-100%); width: var(--sidebar-width); min-width: var(--sidebar-width); }
+
+            .header-close-btn { display: flex; }
+            .sidebar-backdrop.visible { display: block; }
+
+            .proc-grid { grid-template-columns: 1fr 1fr; }
+            .toggle-btn { min-width: 48px; padding: 9px 0; font-size: 9px; }
+            .tab-btn { padding: 13px 8px; font-size: 11px; }
+            .btn-action { padding: 11px; }
+            .form-input { padding: 11px; font-size: 12px; }
+            .proc-btn { min-height: 52px; }
+            .chip { padding: 7px 12px; }
+            .stat-val { font-size: 14px; }
+            .sidebar-toggle { width: 42px; height: 42px; }
+            .map-fab { width: 42px; height: 42px; }
+            .map-fab-stack { top: 64px; }
+        }
+
+        @media (max-width: 480px) {
+            .training-options { grid-template-columns: 1fr; }
+            .stats-card { grid-template-columns: 1fr 1fr; }
+            .stat-cell:nth-child(3) { grid-column: span 2; }
+        }
 
         /* ── Leaflet overrides & Custom Labels ── */
         .leaflet-tooltip.proc-tooltip { background: rgba(13, 17, 23, 0.92); border: 1px solid var(--border-bright); color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-weight: 700; padding: 4px 9px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
@@ -553,13 +780,33 @@ const App = () => {
     const [activeIds, setActiveIds] = useState([]);
     const [tab, setTab] = useState('view');
     const [layers, setLayers] = useState({ sids: true, stars: true, iacs: true });
-    
+
     const [dispOpts, setDispOpts] = useState({ labels: true, constraints: true, distances: true, ranges: false, atz: true, ctr: true, tma: false, fir: false, declutter: true });
     const [textSize, setTextSize] = useState(10);
     const [lineSize, setLineSize] = useState(5);
     const [rwyFilter, setRwyFilter] = useState('ALL');
     const [zoomTrigger, setZoomTrigger] = useState(0);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    const isMobileDefault = typeof window !== 'undefined' && window.innerWidth <= 768;
+    const [sidebarOpen, setSidebarOpen] = useState(!isMobileDefault);
+    const [isMobile, setIsMobile] = useState(isMobileDefault);
+
+    // Filtering & highlighting
+    const [searchQuery, setSearchQuery] = useState('');
+    const [highlightFix, setHighlightFix] = useState('');
+
+    // Collapsible UI sections
+    const [showSettings, setShowSettings] = useState(!isMobileDefault);
+    const [collapsedSections, setCollapsedSections] = useState({ sids: false, stars: false, iacs: false });
+
+    // Training mode
+    const [trainingMode, setTrainingMode] = useState('identify'); // 'identify' | 'sequence'
+    const [quizProc, setQuizProc] = useState(null);
+    const [quizChoices, setQuizChoices] = useState([]);
+    const [quizAnswer, setQuizAnswer] = useState(null);
+    const [quizScore, setQuizScore] = useState({ right: 0, wrong: 0 });
+    const [seqGuess, setSeqGuess] = useState([]);
+    const [seqRevealed, setSeqRevealed] = useState(false);
 
     const [newFixName, setNewFixName] = useState('');
     const [newFixLat, setNewFixLat] = useState('');
@@ -620,6 +867,20 @@ const App = () => {
         }, 300); // Matches CSS transition duration
         return () => clearTimeout(timeout);
     }, [sidebarOpen]);
+
+    // Detect mobile vs desktop on resize
+    useEffect(() => {
+        const handler = () => {
+            const mobile = window.innerWidth <= 768;
+            setIsMobile(mobile);
+        };
+        window.addEventListener('resize', handler);
+        window.addEventListener('orientationchange', handler);
+        return () => {
+            window.removeEventListener('resize', handler);
+            window.removeEventListener('orientationchange', handler);
+        };
+    }, []);
 
     // ── Main Map Rendering Logic (Procedures & Declutter) ───────────────────
     useEffect(() => {
@@ -687,6 +948,7 @@ const App = () => {
         };
 
         // 3. Draw INACTIVE procedures
+        const q = searchQuery.trim().toUpperCase();
         db.procedures.forEach(proc => {
             if (activeIds.includes(proc.id)) return;
             if (proc.type === 'SID' && !layers.sids) return;
@@ -697,12 +959,34 @@ const App = () => {
             const coords = getSegments(proc.waypoints);
             if (coords.length < 2) return;
 
-            L.polyline(coords, { ...STYLES[proc.type], opacity: 0.25, weight: 2 })
+            const procFixes = proc.waypoints.map(w => typeof w === 'string' ? w : w.fix);
+            const matchesHighlight = highlightFix && procFixes.includes(highlightFix);
+            const matchesSearch = !q || proc.name.toUpperCase().includes(q) || (proc.runway || '').toUpperCase().includes(q) || procFixes.some(f => f.includes(q));
+            const dimmed = (highlightFix && !matchesHighlight) || (q && !matchesSearch);
+            const emphasized = matchesHighlight || (q && matchesSearch);
+
+            const baseOpacity = dimmed ? 0.08 : (emphasized ? 0.55 : 0.25);
+            const baseWeight = emphasized ? 3 : 2;
+
+            L.polyline(coords, { ...STYLES[proc.type], opacity: baseOpacity, weight: baseWeight })
              .bindTooltip(`<div style="font-size: ${textSize}px">${proc.name}</div>`, { sticky: true, className: 'proc-tooltip' })
-             .on('mouseover', function() { this.setStyle({ opacity: 0.8, weight: 4 }); })
-             .on('mouseout', function() { this.setStyle({ opacity: 0.25, weight: 2 }); })
+             .on('mouseover', function() { this.setStyle({ opacity: 0.85, weight: baseWeight + 2 }); })
+             .on('mouseout', function() { this.setStyle({ opacity: baseOpacity, weight: baseWeight }); })
              .addTo(fg.procLg);
         });
+
+        // Pulsing highlight marker on the selected fix
+        if (highlightFix && db.fixes[highlightFix]) {
+            const coord = db.fixes[highlightFix];
+            L.circleMarker(coord, {
+                radius: 20, color: '#4cd9e6', weight: 2, opacity: 0.85,
+                fillColor: '#4cd9e6', fillOpacity: 0.12, interactive: false, dashArray: '3, 4'
+            }).addTo(fg.procLg);
+            L.circleMarker(coord, {
+                radius: 10, color: '#4cd9e6', weight: 2, opacity: 1,
+                fillColor: '#4cd9e6', fillOpacity: 0.45, interactive: false
+            }).addTo(fg.procLg);
+        }
 
         // DOM Updater for Labels
         const updateCustomLabel = (id, coord, cx, cy, html, lineColor = 'var(--border-bright)', w = 0, h = 0, marker = null, shouldDraw = true) => {
@@ -1086,7 +1370,7 @@ const App = () => {
             }
 
             intersections.forEach(pt => {
-                L.circleMarker(pt, { radius: 12, color: 'var(--accent-red)', weight: 1, opacity: 0.5, fillColor: 'var(--accent-red)', fillOpacity: 0.15, dashArray: '3, 4', interactive: false })
+                L.circleMarker(pt, { radius: 12, color: '#ff5c68', weight: 1, opacity: 0.5, fillColor: '#ff5c68', fillOpacity: 0.15, dashArray: '3, 4', interactive: false })
                     .addTo(fg.hlLg);
             });
         }
@@ -1099,7 +1383,7 @@ const App = () => {
             }
         });
 
-    }, [db, activeIds, layers, dispOpts, textSize, lineSize, rwyFilter, zoomTrigger]);
+    }, [db, activeIds, layers, dispOpts, textSize, lineSize, rwyFilter, zoomTrigger, searchQuery, highlightFix]);
 
     useEffect(() => {
         const fixNames = Object.keys(db.fixes);
@@ -1191,54 +1475,211 @@ const App = () => {
         setActiveIds(prev => prev.filter(activeId => activeId !== id));
     };
 
-    const filterProc = (p) => {
+    const filterByRunway = (p) => {
         if (rwyFilter === 'ALL') return true;
         if (!p.runway) return false;
         return p.runway.includes(rwyFilter);
     };
 
-    const sids = db.procedures.filter(p => p.type === 'SID' && filterProc(p));
-    const stars = db.procedures.filter(p => p.type === 'STAR' && filterProc(p));
-    const iacs = db.procedures.filter(p => p.type === 'IAC' && filterProc(p));
+    const q = searchQuery.trim().toUpperCase();
+    const procMatches = (p) => {
+        if (!q) return true;
+        const fixes = p.waypoints.map(w => typeof w === 'string' ? w : w.fix).join(' ');
+        return p.name.toUpperCase().includes(q) || (p.runway || '').toUpperCase().includes(q) || fixes.toUpperCase().includes(q);
+    };
+    const procContainsHighlight = (p) => {
+        if (!highlightFix) return true;
+        return p.waypoints.some(w => (typeof w === 'string' ? w : w.fix) === highlightFix);
+    };
+
+    const sids  = db.procedures.filter(p => p.type === 'SID'  && filterByRunway(p) && procMatches(p) && procContainsHighlight(p));
+    const stars = db.procedures.filter(p => p.type === 'STAR' && filterByRunway(p) && procMatches(p) && procContainsHighlight(p));
+    const iacs  = db.procedures.filter(p => p.type === 'IAC'  && filterByRunway(p) && procMatches(p) && procContainsHighlight(p));
 
     const activeProcs = activeIds.map(id => db.procedures.find(p => p.id === id)).filter(Boolean);
 
+    // Aggregate stats for active procedures
+    const activeStats = React.useMemo(() => {
+        if (activeProcs.length === 0) return null;
+        let totalDist = 0;
+        const fixSet = new Set();
+        const segKeys = new Set();
+        activeProcs.forEach(proc => {
+            proc.waypoints.forEach(wp => {
+                const fixName = typeof wp === 'string' ? wp : wp.fix;
+                fixSet.add(fixName);
+            });
+            for (let i = 0; i < proc.waypoints.length - 1; i++) {
+                const f1 = typeof proc.waypoints[i] === 'string' ? proc.waypoints[i] : proc.waypoints[i].fix;
+                const f2 = typeof proc.waypoints[i+1] === 'string' ? proc.waypoints[i+1] : proc.waypoints[i+1].fix;
+                const key = [f1, f2].sort().join('-');
+                if (segKeys.has(key)) continue;
+                segKeys.add(key);
+                const c1 = db.fixes[f1], c2 = db.fixes[f2];
+                if (c1 && c2) {
+                    totalDist += L.latLng(c1).distanceTo(L.latLng(c2)) / 1852;
+                }
+            }
+        });
+        // Count conflict intersections between different active procs
+        let conflicts = 0;
+        const segs = [];
+        activeProcs.forEach(proc => {
+            for (let i = 0; i < proc.waypoints.length - 1; i++) {
+                const f1 = typeof proc.waypoints[i] === 'string' ? proc.waypoints[i] : proc.waypoints[i].fix;
+                const f2 = typeof proc.waypoints[i+1] === 'string' ? proc.waypoints[i+1] : proc.waypoints[i+1].fix;
+                const c1 = db.fixes[f1], c2 = db.fixes[f2];
+                if (c1 && c2) segs.push({ procId: proc.id, p1: c1, p2: c2 });
+            }
+        });
+        const seenConf = new Set();
+        for (let i = 0; i < segs.length; i++) {
+            for (let j = i + 1; j < segs.length; j++) {
+                if (segs[i].procId === segs[j].procId) continue;
+                const pt = getIntersection(segs[i].p1, segs[i].p2, segs[j].p1, segs[j].p2);
+                if (pt) {
+                    const k = `${pt[0].toFixed(3)},${pt[1].toFixed(3)}`;
+                    if (!seenConf.has(k)) { seenConf.add(k); conflicts++; }
+                }
+            }
+        }
+        return {
+            fixes: fixSet.size,
+            distance: totalDist.toFixed(0),
+            conflicts
+        };
+    }, [activeProcs, db.fixes]);
+
+    // Training quiz helpers
+    const startQuiz = React.useCallback(() => {
+        const pool = db.procedures;
+        if (pool.length < 2) return;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        if (trainingMode === 'identify') {
+            // Show the fix sequence, user picks the procedure name
+            const distractors = pool.filter(p => p.id !== pick.id && p.type === pick.type);
+            const shuffled = distractors.sort(() => Math.random() - 0.5).slice(0, 3);
+            const choices = [...shuffled, pick].sort(() => Math.random() - 0.5);
+            setQuizProc(pick);
+            setQuizChoices(choices);
+            setQuizAnswer(null);
+        } else {
+            // sequence mode: show the name, user picks fix order
+            setQuizProc(pick);
+            setSeqGuess([]);
+            setSeqRevealed(false);
+        }
+    }, [db.procedures, trainingMode]);
+
+    useEffect(() => {
+        if (tab === 'train' && !quizProc) startQuiz();
+    }, [tab, quizProc, startQuiz]);
+
+    const answerQuiz = (choiceId) => {
+        if (quizAnswer) return;
+        const correct = choiceId === quizProc.id;
+        setQuizAnswer({ choiceId, correct });
+        setQuizScore(s => correct ? { ...s, right: s.right + 1 } : { ...s, wrong: s.wrong + 1 });
+    };
+
+    const applyPreset = (preset) => {
+        setHighlightFix('');
+        setSearchQuery('');
+        const filter = (fn) => db.procedures.filter(fn).map(p => p.id);
+        if (preset === 'ALL_07_ARR') setActiveIds(filter(p => (p.type === 'STAR' || p.type === 'IAC') && p.runway && p.runway.includes('07')));
+        else if (preset === 'ALL_25_ARR') setActiveIds(filter(p => (p.type === 'STAR' || p.type === 'IAC') && p.runway && p.runway.includes('25')));
+        else if (preset === 'ALL_07_DEP') setActiveIds(filter(p => p.type === 'SID' && p.runway && p.runway.includes('07')));
+        else if (preset === 'ALL_25_DEP') setActiveIds(filter(p => p.type === 'SID' && p.runway && p.runway.includes('25')));
+        else if (preset === 'CLEAR') setActiveIds([]);
+    };
+
+    const handleProcClick = (id) => {
+        setActiveIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const renderProcButton = (p, typeClass) => {
+        const isActive = activeIds.includes(p.id);
+        const procFixes = p.waypoints.map(w => typeof w === 'string' ? w : w.fix);
+        const isHighlighted = highlightFix && procFixes.includes(highlightFix);
+        return (
+            <button
+                key={p.id}
+                className={`proc-btn ${typeClass} ${isActive ? 'active ' + typeClass : ''} ${isHighlighted && !isActive ? 'match' : ''}`}
+                onClick={() => handleProcClick(p.id)}
+            >
+                <span className="proc-btn-name">{p.name} {p.runway ? <span style={{color:'var(--text-muted)', fontSize:'0.9em'}}>({p.runway})</span> : ''}</span>
+                <span className="proc-btn-type">{p.waypoints.length} fixes{isHighlighted ? ' · uses ' + highlightFix : ''}</span>
+                <div className="proc-btn-indicator"></div>
+            </button>
+        );
+    };
+
     return (
-        <div style={{ display:'flex', width:'100%', height:'100%' }}>
+        <div style={{ display:'flex', width:'100%', height:'100%', position:'relative' }}>
+            {isMobile && sidebarOpen && <div className="sidebar-backdrop visible" onClick={() => setSidebarOpen(false)} />}
             <div className={`sidebar ${sidebarOpen ? '' : 'closed'}`}>
                 <div className="sidebar-header">
-                    <div className="header-title">AeroProc DB</div>
-                    <div className="header-sub">Procedure Builder & Viewer</div>
+                    <div className="header-brand">
+                        <div className="header-logo">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                        </div>
+                        <div>
+                            <div className="header-title">AeroProc</div>
+                            <div className="header-sub">VHHH · ATCO SIM PREP</div>
+                        </div>
+                    </div>
+                    <button className="header-close-btn" onClick={() => setSidebarOpen(false)} title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
 
                 <div className="tabs">
-                    <button className={`tab-btn ${tab==='view'?'active':''}`} onClick={() => setTab('view')}>VIEWER</button>
-                    <button className={`tab-btn ${tab==='edit'?'active':''}`} onClick={() => setTab('edit')}>DB BUILDER</button>
+                    <button className={`tab-btn ${tab==='view'?'active':''}`} onClick={() => setTab('view')}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        View
+                    </button>
+                    <button className={`tab-btn ${tab==='train'?'active':''}`} onClick={() => setTab('train')}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+                        Train
+                    </button>
+                    <button className={`tab-btn ${tab==='edit'?'active':''}`} onClick={() => setTab('edit')}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        Build
+                    </button>
                 </div>
 
-                <div className="disp-settings-row" style={{padding: '8px 12px'}}>
-                    <div style={{display:'flex', flex:1, alignItems:'center', paddingRight:'8px', borderRight:'1px solid var(--border)'}}>
-                        <span style={{fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', width:'30px'}}>TEXT</span>
-                        <input className="size-slider" type="range" min="8" max="16" value={textSize} onChange={e => setTextSize(parseInt(e.target.value))} />
+                <div className="settings-wrap">
+                    <div className="settings-head" onClick={() => setShowSettings(s => !s)}>
+                        <span>Display Settings</span>
+                        <svg className={`section-chevron ${showSettings ? '' : 'collapsed'}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
-                    <div style={{display:'flex', flex:1, alignItems:'center', paddingLeft:'8px'}}>
-                        <span style={{fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', width:'30px'}}>LINE</span>
-                        <input className="size-slider" type="range" min="2" max="10" value={lineSize} onChange={e => setLineSize(parseInt(e.target.value))} />
-                    </div>
-                </div>
-
-                <div className="disp-settings-row">
-                    <button className={`toggle-btn ${dispOpts.labels ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, labels: !p.labels}))}>FIX LABELS</button>
-                    <button className={`toggle-btn ${dispOpts.constraints ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, constraints: !p.constraints}))}>RESTRICTIONS</button>
-                    <button className={`toggle-btn ${dispOpts.distances ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, distances: !p.distances}))}>DIST (NM)</button>
-                    <button className={`toggle-btn ${dispOpts.declutter ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, declutter: !p.declutter}))} style={{background: dispOpts.declutter ? 'var(--color-iac-dim)' : 'transparent', borderColor: dispOpts.declutter ? 'var(--color-iac)' : 'var(--border)', color: dispOpts.declutter ? 'var(--color-iac)' : 'var(--text-muted)'}}>DECLUTTER</button>
-                </div>
-                <div className="disp-settings-row">
-                    <button className={`toggle-btn ${dispOpts.ranges ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, ranges: !p.ranges}))}>10NM RINGS</button>
-                    <button className={`toggle-btn ${dispOpts.atz ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, atz: !p.atz}))}>ATZ</button>
-                    <button className={`toggle-btn ${dispOpts.ctr ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, ctr: !p.ctr}))}>CTR</button>
-                    <button className={`toggle-btn ${dispOpts.tma ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, tma: !p.tma}))}>TMA</button>
-                    <button className={`toggle-btn ${dispOpts.fir ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, fir: !p.fir}))}>FIR</button>
+                    {showSettings && (
+                        <div className="settings-body">
+                            <div className="disp-settings-row">
+                                <div style={{display:'flex', flex:1, alignItems:'center', paddingRight:'8px', borderRight:'1px solid var(--border)'}}>
+                                    <span style={{fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', width:'30px'}}>TEXT</span>
+                                    <input className="size-slider" type="range" min="8" max="16" value={textSize} onChange={e => setTextSize(parseInt(e.target.value))} />
+                                </div>
+                                <div style={{display:'flex', flex:1, alignItems:'center', paddingLeft:'8px'}}>
+                                    <span style={{fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', width:'30px'}}>LINE</span>
+                                    <input className="size-slider" type="range" min="2" max="10" value={lineSize} onChange={e => setLineSize(parseInt(e.target.value))} />
+                                </div>
+                            </div>
+                            <div className="disp-settings-row">
+                                <button className={`toggle-btn ${dispOpts.labels ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, labels: !p.labels}))}>LABELS</button>
+                                <button className={`toggle-btn ${dispOpts.constraints ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, constraints: !p.constraints}))}>RESTR</button>
+                                <button className={`toggle-btn ${dispOpts.distances ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, distances: !p.distances}))}>DIST</button>
+                                <button className={`toggle-btn ${dispOpts.declutter ? 'active iac-style' : ''}`} onClick={() => setDispOpts(p => ({...p, declutter: !p.declutter}))}>DECLUTTER</button>
+                            </div>
+                            <div className="disp-settings-row">
+                                <button className={`toggle-btn ${dispOpts.ranges ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, ranges: !p.ranges}))}>10NM RINGS</button>
+                                <button className={`toggle-btn ${dispOpts.atz ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, atz: !p.atz}))}>ATZ</button>
+                                <button className={`toggle-btn ${dispOpts.ctr ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, ctr: !p.ctr}))}>CTR</button>
+                                <button className={`toggle-btn ${dispOpts.tma ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, tma: !p.tma}))}>TMA</button>
+                                <button className={`toggle-btn ${dispOpts.fir ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, fir: !p.fir}))}>FIR</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="sidebar-body">
@@ -1246,100 +1687,262 @@ const App = () => {
                         <input type="file" accept=".json" style={{display:'none'}} ref={fileInputRef} onChange={handleLoadDB} />
                         <button className="btn-action" onClick={() => fileInputRef.current.click()}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            Load JSON
+                            Load
                         </button>
                         <button className="btn-action" onClick={handleSaveDB}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 16 12 21 17 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line></svg>
-                            Save JSON
+                            Save
                         </button>
                     </div>
 
                     {tab === 'view' && (
                         <>
-                            <div className="disp-settings-row" style={{background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border)', margin: '4px 0'}}>
-                                <span style={{fontSize: '10px', fontWeight: 'bold', color: 'var(--text-muted)', marginRight: 'auto', paddingLeft: '4px'}}>RUNWAY FILTER</span>
-                                <button className={`toggle-btn ${rwyFilter === 'ALL' ? 'active' : ''}`} onClick={() => setRwyFilter('ALL')}>ALL</button>
-                                <button className={`toggle-btn ${rwyFilter === '07' ? 'active' : ''}`} onClick={() => setRwyFilter('07')}>07</button>
-                                <button className={`toggle-btn ${rwyFilter === '25' ? 'active' : ''}`} onClick={() => setRwyFilter('25')}>25</button>
+                            {/* Search bar */}
+                            <div className="search-bar">
+                                <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <input className="search-input" placeholder="Search proc / rwy / fix…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                                {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>}
                             </div>
+
+                            {/* Highlight Fix */}
+                            <div>
+                                <div className="form-label">Highlight Fix on Map</div>
+                                <select className="form-input" value={highlightFix} onChange={e => setHighlightFix(e.target.value)}>
+                                    <option value="">— None —</option>
+                                    {Object.keys(db.fixes).sort().map(f => <option key={f} value={f}>{f}</option>)}
+                                </select>
+                                {highlightFix && (
+                                    <div className="highlight-banner" style={{marginTop: 6}}>
+                                        <span className="banner-label">PULSING:</span>
+                                        <span className="banner-value">{highlightFix}</span>
+                                        <span style={{color:'var(--text-muted)'}}>· filters list</span>
+                                        <button className="banner-x" onClick={() => setHighlightFix('')}>×</button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Runway filter */}
+                            <div>
+                                <div className="form-label">Runway Filter</div>
+                                <div className="filter-chips">
+                                    {['ALL','07','07L','07C','07R','25','25L','25R'].map(rwy => (
+                                        <button key={rwy} className={`chip ${rwyFilter === rwy ? 'active' : ''}`} onClick={() => setRwyFilter(rwy)}>{rwy}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Quick presets */}
+                            <div>
+                                <div className="form-label">Quick Load</div>
+                                <div className="filter-chips">
+                                    <button className="chip accent" onClick={() => applyPreset('ALL_07_ARR')}>07 ARR</button>
+                                    <button className="chip accent" onClick={() => applyPreset('ALL_07_DEP')}>07 DEP</button>
+                                    <button className="chip accent" onClick={() => applyPreset('ALL_25_ARR')}>25 ARR</button>
+                                    <button className="chip accent" onClick={() => applyPreset('ALL_25_DEP')}>25 DEP</button>
+                                    <button className="chip" onClick={() => applyPreset('CLEAR')} style={{color: 'var(--accent-red)', borderColor: 'rgba(255,92,104,0.35)'}}>CLEAR</button>
+                                </div>
+                            </div>
+
+                            {/* Stats card for active procs */}
+                            {activeStats && (
+                                <div className="stats-card">
+                                    <div className="stat-cell">
+                                        <div className="stat-val">{activeProcs.length}</div>
+                                        <div className="stat-key">Active</div>
+                                    </div>
+                                    <div className="stat-cell">
+                                        <div className="stat-val">{activeStats.fixes}</div>
+                                        <div className="stat-key">Fixes</div>
+                                    </div>
+                                    <div className={`stat-cell ${activeStats.conflicts > 0 ? 'danger' : ''}`}>
+                                        <div className="stat-val">{activeStats.conflicts}</div>
+                                        <div className="stat-key">Crossings</div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* SIDs */}
                             <div>
-                                <div className="section-header">
-                                    <div className="section-label sids"><div className="section-dot"></div> Departures (SIDs)</div>
+                                <div className="section-header" onClick={() => setCollapsedSections(s => ({...s, sids: !s.sids}))}>
+                                    <div className="section-label sids"><div className="section-dot"></div> Departures (SIDs) <span className="section-count">· {sids.length}</span></div>
+                                    <svg className={`section-chevron ${collapsedSections.sids ? 'collapsed' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </div>
-                                <div className="proc-grid">
-                                    {sids.length === 0 ? <div className="empty-msg">No SIDs in DB</div> :
-                                        sids.map(p => (
-                                            <button key={p.id} className={`proc-btn sid ${activeIds.includes(p.id) ? 'active sid' : ''}`} onClick={() => setActiveIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])}>
-                                                <span className="proc-btn-name">{p.name} {p.runway ? <span style={{color:'var(--text-muted)', fontSize:'0.9em'}}>({p.runway})</span> : ''}</span>
-                                                <span className="proc-btn-type">{p.waypoints.length} Fixes</span>
-                                                <div className="proc-btn-indicator"></div>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
+                                {!collapsedSections.sids && (
+                                    <div className="proc-grid">
+                                        {sids.length === 0 ? <div className="empty-msg">No SIDs match filters</div> : sids.map(p => renderProcButton(p, 'sid'))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* STARs */}
                             <div>
-                                <div className="section-header">
-                                    <div className="section-label stars"><div className="section-dot"></div> Arrivals (STARs)</div>
+                                <div className="section-header" onClick={() => setCollapsedSections(s => ({...s, stars: !s.stars}))}>
+                                    <div className="section-label stars"><div className="section-dot"></div> Arrivals (STARs) <span className="section-count">· {stars.length}</span></div>
+                                    <svg className={`section-chevron ${collapsedSections.stars ? 'collapsed' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </div>
-                                <div className="proc-grid">
-                                    {stars.length === 0 ? <div className="empty-msg">No STARs in DB</div> :
-                                        stars.map(p => (
-                                            <button key={p.id} className={`proc-btn star ${activeIds.includes(p.id) ? 'active star' : ''}`} onClick={() => setActiveIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])}>
-                                                <span className="proc-btn-name">{p.name} {p.runway ? <span style={{color:'var(--text-muted)', fontSize:'0.9em'}}>({p.runway})</span> : ''}</span>
-                                                <span className="proc-btn-type">{p.waypoints.length} Fixes</span>
-                                                <div className="proc-btn-indicator"></div>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
+                                {!collapsedSections.stars && (
+                                    <div className="proc-grid">
+                                        {stars.length === 0 ? <div className="empty-msg">No STARs match filters</div> : stars.map(p => renderProcButton(p, 'star'))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* IACs */}
                             <div>
-                                <div className="section-header">
-                                    <div className="section-label iacs"><div className="section-dot"></div> Approaches (IACs)</div>
+                                <div className="section-header" onClick={() => setCollapsedSections(s => ({...s, iacs: !s.iacs}))}>
+                                    <div className="section-label iacs"><div className="section-dot"></div> Approaches (IACs) <span className="section-count">· {iacs.length}</span></div>
+                                    <svg className={`section-chevron ${collapsedSections.iacs ? 'collapsed' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </div>
-                                <div className="proc-grid">
-                                    {iacs.length === 0 ? <div className="empty-msg">No IACs in DB</div> :
-                                        iacs.map(p => (
-                                            <button key={p.id} className={`proc-btn iac ${activeIds.includes(p.id) ? 'active iac' : ''}`} onClick={() => setActiveIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])}>
-                                                <span className="proc-btn-name">{p.name} {p.runway ? <span style={{color:'var(--text-muted)', fontSize:'0.9em'}}>({p.runway})</span> : ''}</span>
-                                                <span className="proc-btn-type">{p.waypoints.length} Fixes</span>
-                                                <div className="proc-btn-indicator"></div>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
+                                {!collapsedSections.iacs && (
+                                    <div className="proc-grid">
+                                        {iacs.length === 0 ? <div className="empty-msg">No IACs match filters</div> : iacs.map(p => renderProcButton(p, 'iac'))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Active Detail Panel */}
                             {activeProcs.length > 0 && (
-                                <div className="detail-panel" style={{display:'flex', flexDirection:'column', gap:'12px', maxHeight:'40vh', overflowY:'auto'}}>
+                                <div className="detail-panel" style={{display:'flex', flexDirection:'column', gap:'10px', maxHeight:'44vh', overflowY:'auto'}}>
                                     <div className="detail-title" style={{display:'flex', justifyContent:'space-between', marginBottom: 0}}>
-                                        <span>Active Procedures ({activeProcs.length})</span>
+                                        <span>Active ({activeProcs.length})</span>
                                         <span style={{cursor:'pointer', color:'var(--accent-red)'}} onClick={()=>setActiveIds([])}>CLEAR ALL</span>
                                     </div>
                                     {activeProcs.map(proc => (
                                         <div key={proc.id} style={{borderTop:'1px solid var(--border)', paddingTop:'8px'}}>
                                             <div className="detail-row" style={{paddingTop: 0}}>
                                                 <span className="detail-key" style={{color: `var(--color-${proc.type.toLowerCase()})`, fontSize:'11px', fontWeight:700}}>{proc.name}</span>
-                                                <span className="detail-val" style={{fontSize:'10px'}}>{proc.type} • {proc.runway || 'N/A'}</span>
+                                                <span className="detail-val" style={{fontSize:'10px'}}>{proc.type} · {proc.runway || 'N/A'}</span>
                                             </div>
                                             <div className="detail-row" style={{borderBottom:'none', display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
-                                                <span className="detail-val" style={{fontSize:'9px', textAlign:'left', wordBreak:'break-word', color:'var(--text-secondary)', flex:1}}>
+                                                <span className="detail-val" style={{fontSize:'9px', textAlign:'left', wordBreak:'break-word', color:'var(--text-secondary)', flex:1, lineHeight: 1.5}}>
                                                     {proc.waypoints.map(wp => typeof wp === 'string' ? wp : wp.fix).join(' → ')}
                                                 </span>
-                                                <button className="item-del" style={{fontSize:'10px', marginLeft:'8px'}} onClick={() => handleDeleteProcedure(proc.id)}>DELETE</button>
+                                                <button className="item-del" style={{fontSize:'10px', marginLeft:'8px'}} onClick={() => setActiveIds(prev => prev.filter(x => x !== proc.id))}>REMOVE</button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
+                        </>
+                    )}
+
+                    {tab === 'train' && (
+                        <>
+                            <div className="training-mode-toggle">
+                                <button
+                                    className={`toggle-btn ${trainingMode === 'identify' ? 'active' : ''}`}
+                                    onClick={() => { setTrainingMode('identify'); setQuizProc(null); setQuizAnswer(null); }}
+                                >IDENTIFY PROC</button>
+                                <button
+                                    className={`toggle-btn ${trainingMode === 'sequence' ? 'active' : ''}`}
+                                    onClick={() => { setTrainingMode('sequence'); setQuizProc(null); setSeqRevealed(false); }}
+                                >RECALL FIXES</button>
+                            </div>
+
+                            <div className="training-stat-row">
+                                <span style={{color:'var(--text-muted)'}}>SESSION</span>
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <span className="training-score">✓ {quizScore.right}</span>
+                                    <span className="training-miss">✕ {quizScore.wrong}</span>
+                                    <button className="item-del" style={{fontSize:'10px'}} onClick={() => setQuizScore({right:0, wrong:0})}>RESET</button>
+                                </div>
+                            </div>
+
+                            {trainingMode === 'identify' && quizProc && (
+                                <div className="training-card">
+                                    <div style={{fontSize:'10px', color:'var(--text-muted)', fontFamily:"'JetBrains Mono', monospace", textTransform:'uppercase', letterSpacing:'0.08em'}}>
+                                        Which {quizProc.type} uses this sequence?
+                                    </div>
+                                    <div className="training-prompt">
+                                        {quizProc.waypoints.map(w => typeof w === 'string' ? w : w.fix).join(' → ')}
+                                        {quizProc.runway && <span className="proc-badge">RWY {quizProc.runway}</span>}
+                                    </div>
+                                    <div className="training-options">
+                                        {quizChoices.map(c => {
+                                            let cls = 'training-option';
+                                            if (quizAnswer) {
+                                                if (c.id === quizProc.id) cls += ' correct';
+                                                else if (c.id === quizAnswer.choiceId) cls += ' wrong';
+                                                else cls += ' revealed';
+                                            }
+                                            return (
+                                                <button key={c.id} className={cls} onClick={() => answerQuiz(c.id)}>
+                                                    {c.name}
+                                                    <div style={{fontSize:'9px', color:'var(--text-muted)', marginTop:'3px'}}>RWY {c.runway}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button className="add-btn" onClick={() => { setQuizProc(null); startQuiz(); }}>
+                                        {quizAnswer ? 'Next Question →' : 'Skip / New →'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {trainingMode === 'sequence' && quizProc && (() => {
+                                const correctFixes = quizProc.waypoints.map(w => typeof w === 'string' ? w : w.fix);
+                                const remaining = correctFixes.filter((f, i) => !seqGuess.some((g, gi) => gi === i));
+                                const nextCorrect = correctFixes[seqGuess.length];
+                                const complete = seqGuess.length === correctFixes.length;
+                                const correctCount = seqGuess.filter((g, i) => g === correctFixes[i]).length;
+                                return (
+                                    <div className="training-card">
+                                        <div style={{fontSize:'10px', color:'var(--text-muted)', fontFamily:"'JetBrains Mono', monospace", textTransform:'uppercase', letterSpacing:'0.08em'}}>
+                                            Recall fix sequence for:
+                                        </div>
+                                        <div className="training-prompt">
+                                            {quizProc.name}
+                                            {quizProc.runway && <span className="proc-badge">RWY {quizProc.runway}</span>}
+                                        </div>
+                                        <div style={{fontFamily:"'JetBrains Mono', monospace", fontSize:'11px', minHeight: '30px', padding: '8px', background:'var(--bg-primary)', border:'1px solid var(--border)', borderRadius:'6px', color: 'var(--text-primary)', wordBreak:'break-word'}}>
+                                            {seqGuess.length === 0 ? <span style={{color:'var(--text-muted)'}}>Tap fixes in order…</span> :
+                                              seqGuess.map((g, i) => (
+                                                <span key={i} style={{color: seqRevealed ? (g === correctFixes[i] ? 'var(--color-iac)' : 'var(--accent-red)') : 'var(--text-primary)'}}>
+                                                    {g}{i < seqGuess.length - 1 ? ' → ' : ''}
+                                                </span>
+                                              ))
+                                            }
+                                        </div>
+                                        {seqRevealed && (
+                                            <div style={{fontFamily:"'JetBrains Mono', monospace", fontSize:'10px', color:'var(--text-muted)'}}>
+                                                Correct: <span style={{color:'var(--color-iac)'}}>{correctFixes.join(' → ')}</span>
+                                                <div style={{marginTop:4}}>Score: <b style={{color:'var(--color-iac)'}}>{correctCount}</b> / {correctFixes.length}</div>
+                                            </div>
+                                        )}
+
+                                        {!seqRevealed && !complete && (
+                                            <div className="training-options" style={{gridTemplateColumns:'repeat(3, 1fr)'}}>
+                                                {Object.keys(db.fixes).sort().map(f => (
+                                                    <button key={f} className="training-option" style={{padding:'7px', fontSize:'10px', textAlign:'center'}}
+                                                        onClick={() => setSeqGuess([...seqGuess, f])}>{f}</button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div style={{display:'flex', gap:'6px'}}>
+                                            {!seqRevealed && seqGuess.length > 0 && (
+                                                <button className="btn-action" onClick={() => setSeqGuess(seqGuess.slice(0, -1))}>← Undo</button>
+                                            )}
+                                            {!seqRevealed && (
+                                                <button className="add-btn" onClick={() => {
+                                                    setSeqRevealed(true);
+                                                    const right = seqGuess.filter((g, i) => g === correctFixes[i]).length;
+                                                    if (right === correctFixes.length) setQuizScore(s => ({...s, right: s.right + 1}));
+                                                    else setQuizScore(s => ({...s, wrong: s.wrong + 1}));
+                                                }}>Reveal</button>
+                                            )}
+                                            {seqRevealed && (
+                                                <button className="add-btn" onClick={() => { setQuizProc(null); startQuiz(); }}>Next →</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', fontFamily:"'JetBrains Mono', monospace", textAlign:'center', lineHeight: 1.6}}>
+                                Training uses all procedures in your current database.<br/>
+                                Build more in the Build tab to expand the pool.
+                            </div>
                         </>
                     )}
 
@@ -1449,13 +2052,50 @@ const App = () => {
 
         {/* ── Map ── */}
         <div id="map" ref={mapDivRef}>
-            <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle Sidebar">
+            <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle Sidebar" aria-label="Toggle Sidebar">
                 {sidebarOpen ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    isMobile
+                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 )}
             </button>
+
+            <div className="map-fab-stack">
+                <button
+                    className={`map-fab ${dispOpts.declutter ? 'active' : ''}`}
+                    onClick={() => setDispOpts(p => ({...p, declutter: !p.declutter}))}
+                    title="Toggle Declutter"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M9 18h6"/></svg>
+                </button>
+                <button
+                    className="map-fab"
+                    onClick={() => {
+                        const map = fgRef.current.map;
+                        if (!map) return;
+                        if (activeProcs.length === 0) {
+                            map.setView([22.3089, 113.9146], 10);
+                            return;
+                        }
+                        const pts = [];
+                        activeProcs.forEach(proc => proc.waypoints.forEach(w => {
+                            const f = typeof w === 'string' ? w : w.fix;
+                            if (db.fixes[f]) pts.push(db.fixes[f]);
+                        }));
+                        if (pts.length) map.fitBounds(pts, { padding: [60, 60] });
+                    }}
+                    title="Fit to Active"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9V5a2 2 0 0 1 2-2h4"/><path d="M21 9V5a2 2 0 0 0-2-2h-4"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/><path d="M21 15v4a2 2 0 0 1-2 2h-4"/></svg>
+                </button>
+                {activeProcs.length > 0 && (
+                    <button className="map-fab" onClick={() => setActiveIds([])} title="Clear Active" style={{color: 'var(--accent-red)'}}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+                    </button>
+                )}
+            </div>
         </div>
     </div>
 );
