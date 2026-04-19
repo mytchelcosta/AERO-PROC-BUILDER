@@ -517,6 +517,11 @@
             white-space: nowrap; line-height: 1.45;
         }
         .leaflet-tooltip.ac-tooltip::before { display: none; }
+        .leaflet-tooltip.ac-label-pinned {
+            padding: 2px 6px; font-size: 10px;
+            background: rgba(10, 14, 20, 0.82);
+            border-color: rgba(255,255,255,0.15);
+        }
         .ac-tooltip .ac-cs { font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; }
         .ac-tooltip .ac-meta { color: var(--text-secondary); }
         .ac-tooltip .ac-val { color: var(--text-primary); font-weight: 600; }
@@ -857,6 +862,7 @@ const App = () => {
 
     // Live traffic (ADS-B)
     const [liveTraffic, setLiveTraffic] = useState(false);
+    const [showAcLabels, setShowAcLabels] = useState(false);
     const [traffic, setTraffic] = useState([]);
     const [trafficStatus, setTrafficStatus] = useState({ state: 'off', message: '', source: '', lastUpdate: 0 });
     const trafficLgRef = useRef(null);
@@ -1016,26 +1022,41 @@ const App = () => {
         lg.clearLayers();
         if (!liveTraffic) return;
 
+        const arp = db.fixes["VHHH"] || [22.3089, 113.9146];
+        const classifyDir = (ac) => {
+            if (ac.onGround) return 'ground';
+            const latR = ac.lat * Math.PI / 180;
+            const dLat = arp[0] - ac.lat;
+            const dLon = (arp[1] - ac.lon) * Math.cos(latR);
+            const distNM = Math.sqrt(dLat * dLat + dLon * dLon) * 60;
+            if (distNM > 80) return 'crossing';
+            const brg = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+            const absDiff = Math.abs(((ac.track - brg + 540) % 360) - 180);
+            if (absDiff < 70) return 'inbound';
+            if (absDiff > 110) return 'outbound';
+            return 'crossing';
+        };
+
         traffic.forEach(ac => {
-            // Color by altitude band
-            let fill = '#8b949e'; // ground / unknown
-            if (ac.onGround) fill = '#6e7681';
-            else if (ac.altFt < 10000) fill = '#4ddb8d';
-            else if (ac.altFt < 25000) fill = '#ffb547';
-            else fill = '#3b9eff';
+            const dir = classifyDir(ac);
+            // Color by direction: inbound=yellow, outbound=blue, crossing=light gray
+            const fill = dir === 'inbound'  ? '#ffd84a'
+                       : dir === 'outbound' ? '#3b9eff'
+                       : dir === 'ground'   ? '#6e7681'
+                                            : '#e0e6ed';
 
             const rot = ac.track || 0;
-            const size = ac.onGround ? 10 : 14;
+            const size = ac.onGround ? 20 : 28;
 
             const svg = `
                 <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);">
                     <path d="M12 2 L15 10 L22 11 L22 13 L15 14 L14 18 L16 20 L16 22 L12 21 L8 22 L8 20 L10 18 L9 14 L2 13 L2 11 L9 10 Z"
-                          fill="${fill}" stroke="#0a0e14" stroke-width="1" stroke-linejoin="round"/>
+                          fill="${fill}" stroke="#0a0e14" stroke-width="1.2" stroke-linejoin="round"/>
                 </svg>
             `;
 
             const icon = L.divIcon({
-                className: 'ac-marker',
+                className: `ac-marker ac-${dir}`,
                 html: svg,
                 iconSize: [size, size],
                 iconAnchor: [size/2, size/2]
@@ -1056,10 +1077,20 @@ const App = () => {
                         &nbsp;<span class="ac-meta">TRK</span> <span class="ac-val">${trackStr}</span></div>
                 </div>
             `;
-            marker.bindTooltip(tip, { direction: 'top', offset: [0, -6], className: 'ac-tooltip', opacity: 1 });
+            const persistentLbl = `<span class="ac-cs">${ac.callsign}</span>`;
+            marker.bindTooltip(
+                showAcLabels ? persistentLbl : tip,
+                {
+                    direction: 'top',
+                    offset: [0, -10],
+                    className: showAcLabels ? 'ac-tooltip ac-label-pinned' : 'ac-tooltip',
+                    opacity: 1,
+                    permanent: showAcLabels
+                }
+            );
             marker.addTo(lg);
         });
-    }, [traffic, liveTraffic]);
+    }, [traffic, liveTraffic, showAcLabels, db.fixes]);
 
     // ── Main Map Rendering Logic (Procedures & Declutter) ───────────────────
     useEffect(() => {
@@ -1862,6 +1893,13 @@ const App = () => {
                                     {liveTraffic ? '● LIVE TRAFFIC ON' : '○ LIVE TRAFFIC'}
                                 </button>
                             </div>
+                            {liveTraffic && (
+                                <div className="disp-settings-row">
+                                    <button className={`toggle-btn ${showAcLabels ? 'active' : ''}`} onClick={() => setShowAcLabels(v => !v)} style={{flex: 1}}>
+                                        {showAcLabels ? '● AC LABELS ON' : '○ AC LABELS'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
