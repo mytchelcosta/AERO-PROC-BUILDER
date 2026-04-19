@@ -949,11 +949,8 @@ const App = () => {
         let cancelled = false;
         let timer = null;
 
-        // VHHH area bounding box (~200 NM)
-        const bbox = { lamin: 20.5, lamax: 24.0, lomin: 111.0, lomax: 118.0 };
-
-        // Normalise to unified shape: { id, callsign, lat, lon, track, altFt, gsKts, vsFpm, onGround, country, type, reg }
-        const normaliseAdsbLol = (ac) => ({
+        // Normalise ReadsB-format payload (used by adsb.lol, airplanes.live, adsb.fi)
+        const normaliseReadsb = (ac) => ({
             id: ac.hex || ac.r || Math.random().toString(36),
             callsign: (ac.flight || '').trim() || ac.r || '—',
             lat: ac.lat, lon: ac.lon,
@@ -966,55 +963,44 @@ const App = () => {
             type: ac.t || '',
             reg: ac.r || ''
         });
-        const normaliseOpenSky = (s) => ({
-            id: s[0],
-            callsign: (s[1] || '').trim() || '—',
-            lat: s[6], lon: s[5],
-            track: s[10] || 0,
-            altFt: Math.round((s[7] || s[13] || 0) * 3.28084),
-            gsKts: Math.round((s[9] || 0) * 1.94384),
-            vsFpm: Math.round((s[11] || 0) * 196.85),
-            onGround: !!s[8],
-            country: s[2] || '',
-            type: '',
-            reg: ''
-        });
+
+        const arp = db.fixes["VHHH"] || [22.3089, 113.9146];
+
+        // Ordered list of feeds to try. All are free, CORS-enabled, no API key.
+        const sources = [
+            { name: 'adsb.lol',       url: `https://api.adsb.lol/v2/point/${arp[0]}/${arp[1]}/250` },
+            { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${arp[0]}/${arp[1]}/250` },
+            { name: 'adsb.fi',        url: `https://opendata.adsb.fi/api/v2/lat/${arp[0]}/lon/${arp[1]}/dist/250` }
+        ];
 
         const fetchTraffic = async () => {
             if (cancelled) return;
-            // 1) Try adsb.lol (free, CORS-enabled, no key)
-            try {
-                const arp = db.fixes["VHHH"] || [22.3089, 113.9146];
-                const url = `https://api.adsb.lol/v2/point/${arp[0]}/${arp[1]}/250`;
-                const res = await fetch(url, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                const acs = (data.ac || [])
-                    .filter(a => typeof a.lat === 'number' && typeof a.lon === 'number')
-                    .map(normaliseAdsbLol);
-                if (cancelled) return;
-                setTraffic(acs);
-                setTrafficStatus({ state: 'ok', message: '', source: 'adsb.lol', lastUpdate: Date.now() });
-                return;
-            } catch (eA) {
-                // 2) Fallback to OpenSky
+            const errors = [];
+            for (const src of sources) {
                 try {
-                    const url = `https://opensky-network.org/api/states/all?lamin=${bbox.lamin}&lomin=${bbox.lomin}&lamax=${bbox.lamax}&lomax=${bbox.lomax}`;
-                    const res = await fetch(url, { cache: 'no-store' });
+                    const res = await fetch(src.url, { cache: 'no-store' });
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
-                    const acs = (data.states || [])
-                        .filter(s => typeof s[5] === 'number' && typeof s[6] === 'number')
-                        .map(normaliseOpenSky);
+                    const acs = (data.ac || [])
+                        .filter(a => typeof a.lat === 'number' && typeof a.lon === 'number')
+                        .map(normaliseReadsb);
                     if (cancelled) return;
                     setTraffic(acs);
-                    setTrafficStatus({ state: 'ok', message: '', source: 'OpenSky', lastUpdate: Date.now() });
+                    setTrafficStatus({ state: 'ok', message: '', source: src.name, lastUpdate: Date.now() });
                     return;
-                } catch (eB) {
-                    if (cancelled) return;
-                    setTrafficStatus({ state: 'err', message: `Feed unavailable (${eA.message}) · fallback failed (${eB.message})`, source: '', lastUpdate: Date.now() });
+                } catch (e) {
+                    errors.push(`${src.name}: ${e.message}`);
                 }
             }
+            if (cancelled) return;
+            const blocked = errors.every(e => /Failed to fetch|NetworkError/i.test(e));
+            setTrafficStatus({
+                state: 'err',
+                message: blocked
+                    ? 'All feeds blocked — likely an ad-blocker, VPN, or network policy. Try disabling shields/uBlock for this page.'
+                    : errors.join(' · '),
+                source: '', lastUpdate: Date.now()
+            });
         };
 
         fetchTraffic();
