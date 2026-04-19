@@ -530,6 +530,78 @@
         .ac-label-pinned .ac-meta { color: rgba(230, 235, 242, 0.75); }
         .ac-label-pinned .ac-val  { color: #ffffff; }
         .ac-tip .ac-line { white-space: nowrap; }
+
+        /* ── ICAO Reference Modal ── */
+        .ref-overlay {
+            position: fixed; inset: 0; z-index: 5000;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(2px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .ref-modal {
+            width: 100%; max-width: 680px; max-height: 80vh;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-bright);
+            border-radius: 10px;
+            box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .ref-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+        .ref-title { font-weight: 700; letter-spacing: 0.04em; font-size: 13px; color: var(--text-primary); }
+        .ref-close {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
+        }
+        .ref-close:hover { color: var(--text-primary); }
+        .ref-search { position: relative; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .ref-search .search-icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); }
+        .ref-input {
+            width: 100%; padding: 8px 32px 8px 36px;
+            background: var(--bg-secondary); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        }
+        .ref-input:focus { outline: none; border-color: var(--border-bright); }
+        .ref-clear {
+            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 16px; line-height: 1;
+        }
+        .ref-body { overflow-y: auto; padding: 8px 12px 14px; flex: 1; }
+        .ref-hint { padding: 14px 4px; color: var(--text-secondary); font-size: 11.5px; line-height: 1.5; }
+        .ref-hint.err { color: var(--accent-red); }
+        .ref-section { margin-top: 10px; }
+        .ref-section-title {
+            display: flex; align-items: center; justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            color: var(--text-muted); letter-spacing: 0.12em;
+            padding: 6px 2px; border-bottom: 1px solid var(--border);
+        }
+        .ref-count { color: var(--text-secondary); font-weight: 700; }
+        .ref-row {
+            display: grid; grid-template-columns: 64px 1fr auto auto;
+            gap: 8px; align-items: baseline;
+            padding: 6px 4px; font-size: 11.5px;
+            border-bottom: 1px dashed rgba(255,255,255,0.04);
+        }
+        .ref-row:hover { background: var(--bg-secondary); }
+        .ref-code { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--color-sid); }
+        .ref-name { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ref-sub  { color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; }
+        .ref-meta { color: var(--text-muted); font-size: 10.5px; }
+        .ref-empty { padding: 6px 4px; color: var(--text-muted); font-size: 11px; }
+        @media (max-width: 768px) {
+            .ref-overlay { padding: 12px; }
+            .ref-row { grid-template-columns: 56px 1fr; grid-auto-flow: row; gap: 2px 8px; }
+            .ref-row .ref-sub, .ref-row .ref-meta { grid-column: 2; }
+        }
         .ac-tooltip .ac-cs { font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; }
         .ac-tooltip .ac-meta { color: var(--text-secondary); }
         .ac-tooltip .ac-val { color: var(--text-primary); font-weight: 600; }
@@ -874,6 +946,13 @@ const App = () => {
     const [acLabelsDeclutter, setAcLabelsDeclutter] = useState(true);
     const [routes, setRoutes] = useState({});
     const routeFetchingRef = useRef(new Set());
+
+    // ICAO reference search (airlines / aircraft / airports)
+    const [refOpen, setRefOpen] = useState(false);
+    const [refQuery, setRefQuery] = useState('');
+    const [refDb, setRefDb] = useState(null);      // { airlines, aircraft, airports } | null
+    const [refLoading, setRefLoading] = useState(false);
+    const [refError, setRefError] = useState('');
     const [traffic, setTraffic] = useState([]);
     const [trafficStatus, setTrafficStatus] = useState({ state: 'off', message: '', source: '', lastUpdate: 0 });
     const trafficLgRef = useRef(null);
@@ -1021,10 +1100,57 @@ const App = () => {
         };
 
         fetchTraffic();
-        timer = setInterval(fetchTraffic, 10000); // poll every 10s
+        timer = setInterval(fetchTraffic, 4000); // poll every 4s
 
         return () => { cancelled = true; if (timer) clearInterval(timer); };
     }, [liveTraffic, db.fixes]);
+
+    // Lazy-load ICAO reference tables the first time the user opens the search
+    useEffect(() => {
+        if (!refOpen || refDb || refLoading) return;
+        let cancelled = false;
+        setRefLoading(true);
+        setRefError('');
+        const parseTsv = (text) => text.split(/\r?\n/)
+            .filter(l => l && !l.startsWith(';'))
+            .map(l => l.split('\t'));
+        Promise.all([
+            fetch('./ICAO_Airlines.txt').then(r => r.text()),
+            fetch('./ICAO_Aircraft.txt').then(r => r.text()),
+            fetch('./ICAO_Airports.txt').then(r => r.text())
+        ]).then(([al, ac, ap]) => {
+            if (cancelled) return;
+            const airlines = parseTsv(al).map(r => ({
+                icao: r[0] || '', name: r[1] || '', callsign: r[2] || '', country: r[3] || ''
+            }));
+            const aircraft = parseTsv(ac).map(r => ({
+                code: r[0] || '', config: r[1] || '', mfr: r[2] || '', desc: r[3] || ''
+            }));
+            const airports = parseTsv(ap).map(r => ({
+                icao: r[0] || '', name: r[1] || '', country: r[2] || ''
+            }));
+            setRefDb({ airlines, aircraft, airports });
+            setRefLoading(false);
+        }).catch(e => {
+            if (cancelled) return;
+            setRefError(`Failed to load reference data: ${e.message}`);
+            setRefLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, [refOpen, refDb, refLoading]);
+
+    // Filtered reference results (capped per category)
+    const refResults = React.useMemo(() => {
+        if (!refDb || !refQuery.trim()) return null;
+        const q = refQuery.trim().toUpperCase();
+        const match = (s) => (s || '').toUpperCase().includes(q);
+        const cap = 25;
+        return {
+            airlines: refDb.airlines.filter(a => match(a.icao) || match(a.name) || match(a.callsign) || match(a.country)).slice(0, cap),
+            aircraft: refDb.aircraft.filter(a => match(a.code) || match(a.mfr)  || match(a.desc)    || match(a.config)).slice(0, cap),
+            airports: refDb.airports.filter(a => match(a.icao) || match(a.name) || match(a.country)).slice(0, cap)
+        };
+    }, [refDb, refQuery]);
 
     // Background route lookup (callsign → ORIG/DEST) via adsbdb.com
     useEffect(() => {
@@ -1128,6 +1254,7 @@ const App = () => {
                 </div>
             `;
 
+            // Bind with default N position — declutter below may rebind at another anchor
             marker.bindTooltip(tipHtml, {
                 direction: 'top',
                 offset: [0, -14],
@@ -1141,43 +1268,60 @@ const App = () => {
             rendered.push({ marker, tipHtml, priority });
         });
 
-        // Label declutter — only runs when labels are pinned and declutter is on
+        // Label declutter — tries 8 anchors (N,NE,E,SE,S,SW,W,NW) per aircraft
         const declutter = () => {
             if (!showAcLabels) return;
-            const labelW = 128, labelH = 62;
+            const labelW = 128, labelH = 62, icon = 28, pad = 6;
+            const dx = labelW/2 + icon/2 + pad;  // ~78
+            const dy = labelH/2 + icon/2 + pad;  // ~47
+            // anchor: { dir, off, ox, oy } where (ox,oy) = label-center offset from marker in px
+            const anchors = [
+                { dir: 'top',    off: [0,   -(icon/2 + pad)],       ox: 0,   oy: -dy },
+                { dir: 'right',  off: [icon/2 + pad,  -labelH/2],   ox: dx,  oy: -dy/2 },
+                { dir: 'left',   off: [-(icon/2 + pad), -labelH/2], ox: -dx, oy: -dy/2 },
+                { dir: 'right',  off: [icon/2 + pad,   0],          ox: dx,  oy: 0 },
+                { dir: 'left',   off: [-(icon/2 + pad), 0],         ox: -dx, oy: 0 },
+                { dir: 'right',  off: [icon/2 + pad,  labelH/2],    ox: dx,  oy: dy/2 },
+                { dir: 'left',   off: [-(icon/2 + pad), labelH/2],  ox: -dx, oy: dy/2 },
+                { dir: 'bottom', off: [0,   icon/2 + pad],          ox: 0,   oy: dy },
+            ];
+
             if (!acLabelsDeclutter) {
-                // Restore any previously unbound labels
                 rendered.forEach(({ marker, tipHtml }) => {
-                    if (!marker.getTooltip()) {
-                        marker.bindTooltip(tipHtml, {
-                            direction: 'top', offset: [0, -14],
-                            className: 'ac-tooltip ac-label-pinned',
-                            opacity: 1, permanent: true
-                        });
-                    }
+                    if (marker.getTooltip()) marker.unbindTooltip();
+                    marker.bindTooltip(tipHtml, {
+                        direction: 'top', offset: [0, -(icon/2 + pad)],
+                        className: 'ac-tooltip ac-label-pinned',
+                        opacity: 1, permanent: true
+                    });
                 });
                 return;
             }
+
             const sorted = [...rendered].sort((a, b) => a.priority - b.priority);
             const accepted = [];
             sorted.forEach(({ marker, tipHtml }) => {
                 const pt = map.latLngToContainerPoint(marker.getLatLng());
-                const rect = { x1: pt.x - labelW/2, y1: pt.y - 14 - labelH, x2: pt.x + labelW/2, y2: pt.y - 14 };
-                const overlaps = accepted.some(r =>
-                    !(rect.x2 < r.x1 || rect.x1 > r.x2 || rect.y2 < r.y1 || rect.y1 > r.y2)
-                );
-                if (overlaps) {
-                    if (marker.getTooltip()) marker.unbindTooltip();
-                } else {
-                    accepted.push(rect);
-                    if (!marker.getTooltip()) {
+                let placed = false;
+                for (const a of anchors) {
+                    const cx = pt.x + a.ox, cy = pt.y + a.oy;
+                    const rect = { x1: cx - labelW/2, y1: cy - labelH/2, x2: cx + labelW/2, y2: cy + labelH/2 };
+                    const hit = accepted.some(r =>
+                        !(rect.x2 < r.x1 || rect.x1 > r.x2 || rect.y2 < r.y1 || rect.y1 > r.y2)
+                    );
+                    if (!hit) {
+                        accepted.push(rect);
+                        if (marker.getTooltip()) marker.unbindTooltip();
                         marker.bindTooltip(tipHtml, {
-                            direction: 'top', offset: [0, -14],
+                            direction: a.dir, offset: a.off,
                             className: 'ac-tooltip ac-label-pinned',
                             opacity: 1, permanent: true
                         });
+                        placed = true;
+                        break;
                     }
                 }
+                if (!placed && marker.getTooltip()) marker.unbindTooltip();
             });
         };
         declutter();
@@ -2436,12 +2580,104 @@ const App = () => {
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
                 </button>
+                <button
+                    className={`map-fab ${refOpen ? 'active' : ''}`}
+                    onClick={() => setRefOpen(true)}
+                    title="ICAO lookup (airlines / aircraft / airports)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
                 {activeProcs.length > 0 && (
                     <button className="map-fab" onClick={() => setActiveIds([])} title="Clear Active" style={{color: 'var(--accent-red)'}}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
                     </button>
                 )}
             </div>
+
+            {refOpen && (
+                <div className="ref-overlay" onClick={() => setRefOpen(false)}>
+                    <div className="ref-modal" onClick={e => e.stopPropagation()}>
+                        <div className="ref-head">
+                            <div className="ref-title">ICAO Reference Lookup</div>
+                            <button className="ref-close" onClick={() => setRefOpen(false)}>×</button>
+                        </div>
+                        <div className="ref-search">
+                            <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input
+                                className="ref-input"
+                                autoFocus
+                                placeholder="Callsign (CPA), type (B77L), airline name, airport ICAO…"
+                                value={refQuery}
+                                onChange={e => setRefQuery(e.target.value)}
+                            />
+                            {refQuery && <button className="ref-clear" onClick={() => setRefQuery('')}>×</button>}
+                        </div>
+                        <div className="ref-body">
+                            {refLoading && <div className="ref-hint">Loading reference data…</div>}
+                            {refError  && <div className="ref-hint err">{refError}</div>}
+                            {!refLoading && !refError && refDb && !refQuery.trim() && (
+                                <div className="ref-hint">
+                                    Type anything — ICAO code (e.g. <b>CPA</b>), callsign (<b>CATHAY</b>),
+                                    aircraft type (<b>B77L</b>), airline or airport name.
+                                    <div style={{marginTop:6, color:'var(--text-muted)', fontSize:10}}>
+                                        {refDb.airlines.length} airlines · {refDb.aircraft.length} aircraft types · {refDb.airports.length} airports
+                                    </div>
+                                </div>
+                            )}
+                            {refResults && (
+                                <>
+                                    <div className="ref-section">
+                                        <div className="ref-section-title">
+                                            <span>AIRLINES</span>
+                                            <span className="ref-count">{refResults.airlines.length}{refResults.airlines.length === 25 ? '+' : ''}</span>
+                                        </div>
+                                        {refResults.airlines.length === 0
+                                            ? <div className="ref-empty">— no matches —</div>
+                                            : refResults.airlines.map((a, i) => (
+                                                <div className="ref-row" key={`al${i}`}>
+                                                    <span className="ref-code">{a.icao}</span>
+                                                    <span className="ref-name">{a.name}</span>
+                                                    <span className="ref-sub">“{a.callsign}”</span>
+                                                    <span className="ref-meta">{a.country}</span>
+                                                </div>
+                                              ))}
+                                    </div>
+                                    <div className="ref-section">
+                                        <div className="ref-section-title">
+                                            <span>AIRCRAFT</span>
+                                            <span className="ref-count">{refResults.aircraft.length}{refResults.aircraft.length === 25 ? '+' : ''}</span>
+                                        </div>
+                                        {refResults.aircraft.length === 0
+                                            ? <div className="ref-empty">— no matches —</div>
+                                            : refResults.aircraft.map((a, i) => (
+                                                <div className="ref-row" key={`ac${i}`}>
+                                                    <span className="ref-code">{a.code}</span>
+                                                    <span className="ref-name">{a.mfr} {a.desc}</span>
+                                                    <span className="ref-meta">{a.config}</span>
+                                                </div>
+                                              ))}
+                                    </div>
+                                    <div className="ref-section">
+                                        <div className="ref-section-title">
+                                            <span>AIRPORTS</span>
+                                            <span className="ref-count">{refResults.airports.length}{refResults.airports.length === 25 ? '+' : ''}</span>
+                                        </div>
+                                        {refResults.airports.length === 0
+                                            ? <div className="ref-empty">— no matches —</div>
+                                            : refResults.airports.map((a, i) => (
+                                                <div className="ref-row" key={`ap${i}`}>
+                                                    <span className="ref-code">{a.icao}</span>
+                                                    <span className="ref-name">{a.name}</span>
+                                                    <span className="ref-meta">{a.country}</span>
+                                                </div>
+                                              ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     </div>
 );
