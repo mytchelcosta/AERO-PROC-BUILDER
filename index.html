@@ -530,6 +530,13 @@
         .ac-label-pinned .ac-meta { color: rgba(230, 235, 242, 0.75); }
         .ac-label-pinned .ac-val  { color: #ffffff; }
         .ac-tip .ac-line { white-space: nowrap; }
+        .ac-tip .ac-wtc {
+            display: inline-block;
+            min-width: 10px; padding: 0 3px;
+            color: #0a0e14; background: rgba(255,255,255,0.88);
+            border-radius: 2px; font-weight: 700; font-size: 9px;
+            text-shadow: none; letter-spacing: 0.02em;
+        }
 
         /* ── ICAO Reference Modal ── */
         .ref-overlay {
@@ -913,7 +920,7 @@ const App = () => {
     const [tab, setTab] = useState('view');
     const [layers, setLayers] = useState({ sids: true, stars: true, iacs: true });
 
-    const [dispOpts, setDispOpts] = useState({ labels: true, constraints: true, distances: true, ranges: false, atz: true, ctr: true, tma: false, fir: false, declutter: true });
+    const [dispOpts, setDispOpts] = useState({ labels: true, constraints: true, distances: true, ranges: true, atz: false, ctr: true, tma: true, fir: false, declutter: true });
     const [textSize, setTextSize] = useState(10);
     const [lineSize, setLineSize] = useState(5);
     const [rwyFilter, setRwyFilter] = useState('ALL');
@@ -941,8 +948,8 @@ const App = () => {
     const [seqRevealed, setSeqRevealed] = useState(false);
 
     // Live traffic (ADS-B)
-    const [liveTraffic, setLiveTraffic] = useState(false);
-    const [showAcLabels, setShowAcLabels] = useState(false);
+    const [liveTraffic, setLiveTraffic] = useState(true);
+    const [showAcLabels, setShowAcLabels] = useState(true);
     const [acLabelsDeclutter, setAcLabelsDeclutter] = useState(true);
     const [routes, setRoutes] = useState({});
     const routeFetchingRef = useRef(new Set());
@@ -956,6 +963,7 @@ const App = () => {
     const [traffic, setTraffic] = useState([]);
     const [trafficStatus, setTrafficStatus] = useState({ state: 'off', message: '', source: '', lastUpdate: 0 });
     const trafficLgRef = useRef(null);
+    const leaderLgRef = useRef(null);
 
     const [newFixName, setNewFixName] = useState('');
     const [newFixLat, setNewFixLat] = useState('');
@@ -1006,8 +1014,10 @@ const App = () => {
         const hlLg      = L.layerGroup().addTo(map);
         const trafficLg = L.layerGroup().addTo(map);
         trafficLgRef.current = trafficLg;
+        const leaderLg = L.layerGroup().addTo(map);
+        leaderLgRef.current = leaderLg;
 
-        fgRef.current = { map, procLg, hlLg, trafficLg };
+        fgRef.current = { map, procLg, hlLg, trafficLg, leaderLg };
         mapRef.current = map;
     }, []);
 
@@ -1039,6 +1049,7 @@ const App = () => {
             setTraffic([]);
             setTrafficStatus(s => ({ ...s, state: 'off', message: '', source: '' }));
             if (trafficLgRef.current) trafficLgRef.current.clearLayers();
+            if (leaderLgRef.current) leaderLgRef.current.clearLayers();
             return;
         }
 
@@ -1105,9 +1116,9 @@ const App = () => {
         return () => { cancelled = true; if (timer) clearInterval(timer); };
     }, [liveTraffic, db.fixes]);
 
-    // Lazy-load ICAO reference tables the first time the user opens the search
+    // Lazy-load ICAO reference tables on first need (search modal OR live traffic on)
     useEffect(() => {
-        if (!refOpen || refDb || refLoading) return;
+        if ((!refOpen && !liveTraffic) || refDb || refLoading) return;
         let cancelled = false;
         setRefLoading(true);
         setRefError('');
@@ -1137,7 +1148,15 @@ const App = () => {
             setRefLoading(false);
         });
         return () => { cancelled = true; };
-    }, [refOpen, refDb, refLoading]);
+    }, [refOpen, liveTraffic, refDb, refLoading]);
+
+    // Fast type-code → aircraft row lookup (for WTC letter)
+    const typeMap = React.useMemo(() => {
+        if (!refDb) return null;
+        const m = new Map();
+        refDb.aircraft.forEach(a => { if (a.code) m.set(a.code.toUpperCase(), a); });
+        return m;
+    }, [refDb]);
 
     // Filtered reference results (capped per category)
     const refResults = React.useMemo(() => {
@@ -1213,10 +1232,10 @@ const App = () => {
 
         traffic.forEach(ac => {
             const dir = classifyDir(ac);
+            // inbound to VHHH → yellow, outbound → blue, everything else → white
             const fill = dir === 'inbound'  ? '#ffd84a'
                        : dir === 'outbound' ? '#3b9eff'
-                       : dir === 'ground'   ? '#6e7681'
-                                            : '#e0e6ed';
+                                            : '#ffffff';
             const rot = ac.track || 0;
             const size = ac.onGround ? 20 : 28;
 
@@ -1239,7 +1258,9 @@ const App = () => {
             const vsIcon   = ac.vsFpm > 256 ? '↑' : ac.vsFpm < -256 ? '↓' : '→';
             const trackStr = `${String(Math.round(ac.track)).padStart(3, '0')}°`;
             const gsStr    = `${Math.round(ac.gsKts)} kt`;
-            const type     = ac.type || '—';
+            const type     = ac.type || '----';
+            const typeRow  = typeMap && ac.type ? typeMap.get(ac.type.toUpperCase()) : null;
+            const wtc      = (typeRow && typeRow.config && typeRow.config[0]) || '-';
             const rt       = routes[ac.callsign];
             const orig     = (rt && rt.orig) || '----';
             const dest     = (rt && rt.dest) || '----';
@@ -1248,7 +1269,7 @@ const App = () => {
             const tipHtml = `
                 <div class="ac-tip">
                     <div class="ac-line ac-cs">${cs}</div>
-                    <div class="ac-line"><span class="ac-val">${type}</span> <span class="ac-meta">·</span> <span class="ac-val">${orig}</span><span class="ac-meta">→</span><span class="ac-val">${dest}</span></div>
+                    <div class="ac-line"><span class="ac-val">${type}</span> <span class="ac-wtc">${wtc}</span> <span class="ac-meta">·</span> <span class="ac-val">${orig}</span><span class="ac-meta">→</span><span class="ac-val">${dest}</span></div>
                     <div class="ac-line"><span class="ac-meta">ALT</span> <span class="ac-val">${altStr}</span> <span class="ac-val">${vsIcon}</span></div>
                     <div class="ac-line"><span class="ac-meta">GS</span> <span class="ac-val">${gsStr}</span> &nbsp;<span class="ac-meta">TRK</span> <span class="ac-val">${trackStr}</span></div>
                 </div>
@@ -1268,8 +1289,12 @@ const App = () => {
             rendered.push({ marker, tipHtml, priority });
         });
 
+        const leaderLg = leaderLgRef.current;
+        if (leaderLg) leaderLg.clearLayers();
+
         // Label declutter — tries 8 anchors (N,NE,E,SE,S,SW,W,NW) per aircraft
         const declutter = () => {
+            if (leaderLg) leaderLg.clearLayers();
             if (!showAcLabels) return;
             const labelW = 128, labelH = 62, icon = 28, pad = 6;
             const dx = labelW/2 + icon/2 + pad;  // ~78
@@ -1294,6 +1319,15 @@ const App = () => {
                         className: 'ac-tooltip ac-label-pinned',
                         opacity: 1, permanent: true
                     });
+                    if (leaderLg) {
+                        const pt = map.latLngToContainerPoint(marker.getLatLng());
+                        const ll1 = map.containerPointToLatLng([pt.x, pt.y - icon/2]);
+                        const ll2 = map.containerPointToLatLng([pt.x, pt.y - (icon/2 + pad)]);
+                        L.polyline([ll1, ll2], {
+                            color: '#e0e6ed', weight: 1, opacity: 0.45,
+                            interactive: false, dashArray: '2,3'
+                        }).addTo(leaderLg);
+                    }
                 });
                 return;
             }
@@ -1317,6 +1351,24 @@ const App = () => {
                             className: 'ac-tooltip ac-label-pinned',
                             opacity: 1, permanent: true
                         });
+                        // Leader line from icon edge to label edge, in container px → latlng
+                        if (leaderLg) {
+                            const from = pt;
+                            const to   = { x: cx, y: cy };
+                            // stop short of the label rect so the line doesn't visually overlap
+                            const dxL = to.x - from.x, dyL = to.y - from.y;
+                            const len = Math.hypot(dxL, dyL) || 1;
+                            const iconEdge = icon/2;
+                            const labelEdge = 4;
+                            const p1 = { x: from.x + dxL * (iconEdge / len), y: from.y + dyL * (iconEdge / len) };
+                            const p2 = { x: to.x   - dxL * ((labelW/2 - labelEdge) / len), y: to.y - dyL * ((labelH/2 - labelEdge) / len) };
+                            const ll1 = map.containerPointToLatLng([p1.x, p1.y]);
+                            const ll2 = map.containerPointToLatLng([p2.x, p2.y]);
+                            L.polyline([ll1, ll2], {
+                                color: '#e0e6ed', weight: 1, opacity: 0.45,
+                                interactive: false, dashArray: '2,3'
+                            }).addTo(leaderLg);
+                        }
                         placed = true;
                         break;
                     }
@@ -1327,7 +1379,7 @@ const App = () => {
         declutter();
         map.on('moveend zoomend', declutter);
         return () => { map.off('moveend zoomend', declutter); };
-    }, [traffic, liveTraffic, showAcLabels, acLabelsDeclutter, routes, db.fixes]);
+    }, [traffic, liveTraffic, showAcLabels, acLabelsDeclutter, routes, db.fixes, typeMap]);
 
     // ── Main Map Rendering Logic (Procedures & Declutter) ───────────────────
     useEffect(() => {
