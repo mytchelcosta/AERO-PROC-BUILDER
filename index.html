@@ -492,10 +492,57 @@
             border-radius: 10px; 
             white-space: nowrap; 
             transform: translate(-50%, -50%); 
-            display: inline-block; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5); 
-            letter-spacing: 0.05em; 
+            display: inline-block;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            letter-spacing: 0.05em;
         }
+
+        /* ── Live Traffic (ADS-B) ── */
+        .ac-marker {
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.25s ease-out;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+            cursor: pointer;
+        }
+        .ac-marker:hover { transform: scale(1.4); z-index: 1000 !important; }
+        .ac-marker svg { pointer-events: none; }
+
+        .leaflet-tooltip.ac-tooltip {
+            background: rgba(10, 14, 20, 0.95);
+            border: 1px solid var(--border-bright);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            padding: 6px 9px; border-radius: 6px;
+            box-shadow: var(--shadow-md); backdrop-filter: blur(6px);
+            white-space: nowrap; line-height: 1.45;
+        }
+        .leaflet-tooltip.ac-tooltip::before { display: none; }
+        .ac-tooltip .ac-cs { font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; }
+        .ac-tooltip .ac-meta { color: var(--text-secondary); }
+        .ac-tooltip .ac-val { color: var(--text-primary); font-weight: 600; }
+
+        .traffic-status {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-radius: 7px;
+            background: rgba(77, 219, 141, 0.08);
+            border: 1px solid rgba(77, 219, 141, 0.3);
+            color: var(--color-iac);
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        }
+        .traffic-status.err { background: rgba(255, 92, 104, 0.08); border-color: rgba(255, 92, 104, 0.3); color: var(--accent-red); }
+        .traffic-status.off { background: var(--bg-secondary); border-color: var(--border); color: var(--text-muted); }
+        .traffic-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        .traffic-status.off .traffic-dot { animation: none; box-shadow: none; opacity: 0.5; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .traffic-count { margin-left: auto; color: inherit; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -808,6 +855,12 @@ const App = () => {
     const [seqGuess, setSeqGuess] = useState([]);
     const [seqRevealed, setSeqRevealed] = useState(false);
 
+    // Live traffic (ADS-B)
+    const [liveTraffic, setLiveTraffic] = useState(false);
+    const [traffic, setTraffic] = useState([]);
+    const [trafficStatus, setTrafficStatus] = useState({ state: 'off', message: '', source: '', lastUpdate: 0 });
+    const trafficLgRef = useRef(null);
+
     const [newFixName, setNewFixName] = useState('');
     const [newFixLat, setNewFixLat] = useState('');
     const [newFixLon, setNewFixLon] = useState('');
@@ -855,8 +908,10 @@ const App = () => {
         
         const procLg    = L.layerGroup().addTo(map);
         const hlLg      = L.layerGroup().addTo(map);
+        const trafficLg = L.layerGroup().addTo(map);
+        trafficLgRef.current = trafficLg;
 
-        fgRef.current = { map, procLg, hlLg };
+        fgRef.current = { map, procLg, hlLg, trafficLg };
         mapRef.current = map;
     }, []);
 
@@ -881,6 +936,144 @@ const App = () => {
             window.removeEventListener('orientationchange', handler);
         };
     }, []);
+
+    // ── Live Traffic Polling (ADS-B) ────────────────────────────────────────
+    useEffect(() => {
+        if (!liveTraffic) {
+            setTraffic([]);
+            setTrafficStatus(s => ({ ...s, state: 'off', message: '', source: '' }));
+            if (trafficLgRef.current) trafficLgRef.current.clearLayers();
+            return;
+        }
+
+        let cancelled = false;
+        let timer = null;
+
+        // VHHH area bounding box (~200 NM)
+        const bbox = { lamin: 20.5, lamax: 24.0, lomin: 111.0, lomax: 118.0 };
+
+        // Normalise to unified shape: { id, callsign, lat, lon, track, altFt, gsKts, vsFpm, onGround, country, type, reg }
+        const normaliseAdsbLol = (ac) => ({
+            id: ac.hex || ac.r || Math.random().toString(36),
+            callsign: (ac.flight || '').trim() || ac.r || '—',
+            lat: ac.lat, lon: ac.lon,
+            track: typeof ac.track === 'number' ? ac.track : (ac.true_heading || 0),
+            altFt: ac.alt_baro === 'ground' ? 0 : (typeof ac.alt_baro === 'number' ? ac.alt_baro : (ac.alt_geom || 0)),
+            gsKts: ac.gs || 0,
+            vsFpm: ac.baro_rate || ac.geom_rate || 0,
+            onGround: ac.alt_baro === 'ground',
+            country: '',
+            type: ac.t || '',
+            reg: ac.r || ''
+        });
+        const normaliseOpenSky = (s) => ({
+            id: s[0],
+            callsign: (s[1] || '').trim() || '—',
+            lat: s[6], lon: s[5],
+            track: s[10] || 0,
+            altFt: Math.round((s[7] || s[13] || 0) * 3.28084),
+            gsKts: Math.round((s[9] || 0) * 1.94384),
+            vsFpm: Math.round((s[11] || 0) * 196.85),
+            onGround: !!s[8],
+            country: s[2] || '',
+            type: '',
+            reg: ''
+        });
+
+        const fetchTraffic = async () => {
+            if (cancelled) return;
+            // 1) Try adsb.lol (free, CORS-enabled, no key)
+            try {
+                const arp = db.fixes["VHHH"] || [22.3089, 113.9146];
+                const url = `https://api.adsb.lol/v2/point/${arp[0]}/${arp[1]}/250`;
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const acs = (data.ac || [])
+                    .filter(a => typeof a.lat === 'number' && typeof a.lon === 'number')
+                    .map(normaliseAdsbLol);
+                if (cancelled) return;
+                setTraffic(acs);
+                setTrafficStatus({ state: 'ok', message: '', source: 'adsb.lol', lastUpdate: Date.now() });
+                return;
+            } catch (eA) {
+                // 2) Fallback to OpenSky
+                try {
+                    const url = `https://opensky-network.org/api/states/all?lamin=${bbox.lamin}&lomin=${bbox.lomin}&lamax=${bbox.lamax}&lomax=${bbox.lomax}`;
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    const acs = (data.states || [])
+                        .filter(s => typeof s[5] === 'number' && typeof s[6] === 'number')
+                        .map(normaliseOpenSky);
+                    if (cancelled) return;
+                    setTraffic(acs);
+                    setTrafficStatus({ state: 'ok', message: '', source: 'OpenSky', lastUpdate: Date.now() });
+                    return;
+                } catch (eB) {
+                    if (cancelled) return;
+                    setTrafficStatus({ state: 'err', message: `Feed unavailable (${eA.message}) · fallback failed (${eB.message})`, source: '', lastUpdate: Date.now() });
+                }
+            }
+        };
+
+        fetchTraffic();
+        timer = setInterval(fetchTraffic, 10000); // poll every 10s
+
+        return () => { cancelled = true; if (timer) clearInterval(timer); };
+    }, [liveTraffic, db.fixes]);
+
+    // Render live traffic markers when data changes
+    useEffect(() => {
+        const lg = trafficLgRef.current;
+        if (!lg) return;
+        lg.clearLayers();
+        if (!liveTraffic) return;
+
+        traffic.forEach(ac => {
+            // Color by altitude band
+            let fill = '#8b949e'; // ground / unknown
+            if (ac.onGround) fill = '#6e7681';
+            else if (ac.altFt < 10000) fill = '#4ddb8d';
+            else if (ac.altFt < 25000) fill = '#ffb547';
+            else fill = '#3b9eff';
+
+            const rot = ac.track || 0;
+            const size = ac.onGround ? 10 : 14;
+
+            const svg = `
+                <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);">
+                    <path d="M12 2 L15 10 L22 11 L22 13 L15 14 L14 18 L16 20 L16 22 L12 21 L8 22 L8 20 L10 18 L9 14 L2 13 L2 11 L9 10 Z"
+                          fill="${fill}" stroke="#0a0e14" stroke-width="1" stroke-linejoin="round"/>
+                </svg>
+            `;
+
+            const icon = L.divIcon({
+                className: 'ac-marker',
+                html: svg,
+                iconSize: [size, size],
+                iconAnchor: [size/2, size/2]
+            });
+            const marker = L.marker([ac.lat, ac.lon], { icon, keyboard: false });
+
+            const altStr = ac.onGround ? 'GND' : (ac.altFt >= 18000 ? `FL${String(Math.round(ac.altFt / 100)).padStart(3, '0')}` : `${Math.round(ac.altFt).toLocaleString()} ft`);
+            const vsIcon = ac.vsFpm > 256 ? '↑' : ac.vsFpm < -256 ? '↓' : '→';
+            const trackStr = `${String(Math.round(ac.track)).padStart(3, '0')}°`;
+            const meta = [ac.reg, ac.type, ac.country].filter(Boolean).join(' · ');
+
+            const tip = `
+                <div>
+                    <span class="ac-cs">${ac.callsign}</span>
+                    ${meta ? `<div class="ac-meta">${meta}</div>` : ''}
+                    <div><span class="ac-meta">ALT</span> <span class="ac-val">${altStr}</span> ${vsIcon}</div>
+                    <div><span class="ac-meta">GS</span> <span class="ac-val">${Math.round(ac.gsKts)} kt</span>
+                        &nbsp;<span class="ac-meta">TRK</span> <span class="ac-val">${trackStr}</span></div>
+                </div>
+            `;
+            marker.bindTooltip(tip, { direction: 'top', offset: [0, -6], className: 'ac-tooltip', opacity: 1 });
+            marker.addTo(lg);
+        });
+    }, [traffic, liveTraffic]);
 
     // ── Main Map Rendering Logic (Procedures & Declutter) ───────────────────
     useEffect(() => {
@@ -1678,6 +1871,11 @@ const App = () => {
                                 <button className={`toggle-btn ${dispOpts.tma ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, tma: !p.tma}))}>TMA</button>
                                 <button className={`toggle-btn ${dispOpts.fir ? 'active' : ''}`} onClick={() => setDispOpts(p => ({...p, fir: !p.fir}))}>FIR</button>
                             </div>
+                            <div className="disp-settings-row">
+                                <button className={`toggle-btn ${liveTraffic ? 'active star-style' : ''}`} onClick={() => setLiveTraffic(v => !v)} style={{flex: 1}}>
+                                    {liveTraffic ? '● LIVE TRAFFIC ON' : '○ LIVE TRAFFIC'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1697,6 +1895,23 @@ const App = () => {
 
                     {tab === 'view' && (
                         <>
+                            {/* Live traffic status */}
+                            {liveTraffic && (
+                                <div className={`traffic-status ${trafficStatus.state === 'err' ? 'err' : ''}`}>
+                                    <span className="traffic-dot"></span>
+                                    {trafficStatus.state === 'err' ? (
+                                        <span style={{flex:1, whiteSpace:'normal', lineHeight: 1.35}}>
+                                            <b>Traffic feed error.</b> {trafficStatus.message}
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <span>LIVE · {trafficStatus.source || '…'}</span>
+                                            <span className="traffic-count">{traffic.length} ac</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Search bar */}
                             <div className="search-bar">
                                 <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -2089,6 +2304,14 @@ const App = () => {
                     title="Fit to Active"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9V5a2 2 0 0 1 2-2h4"/><path d="M21 9V5a2 2 0 0 0-2-2h-4"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/><path d="M21 15v4a2 2 0 0 1-2 2h-4"/></svg>
+                </button>
+                <button
+                    className={`map-fab ${liveTraffic ? 'active' : ''}`}
+                    onClick={() => setLiveTraffic(v => !v)}
+                    title={liveTraffic ? `Live traffic: ${trafficStatus.source || 'loading'} (${traffic.length})` : 'Enable live traffic'}
+                    style={liveTraffic && trafficStatus.state === 'err' ? {color: 'var(--accent-red)', borderColor: 'var(--accent-red)'} : {}}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
                 </button>
                 {activeProcs.length > 0 && (
                     <button className="map-fab" onClick={() => setActiveIds([])} title="Clear Active" style={{color: 'var(--accent-red)'}}>
