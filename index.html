@@ -529,6 +529,7 @@
         }
         .ac-label-pinned .ac-meta { color: rgba(230, 235, 242, 0.75); }
         .ac-label-pinned .ac-val  { color: #ffffff; }
+        .ac-tip .ac-line { white-space: nowrap; }
         .ac-tooltip .ac-cs { font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; }
         .ac-tooltip .ac-meta { color: var(--text-secondary); }
         .ac-tooltip .ac-val { color: var(--text-primary); font-weight: 600; }
@@ -870,6 +871,9 @@ const App = () => {
     // Live traffic (ADS-B)
     const [liveTraffic, setLiveTraffic] = useState(false);
     const [showAcLabels, setShowAcLabels] = useState(false);
+    const [acLabelsDeclutter, setAcLabelsDeclutter] = useState(true);
+    const [routes, setRoutes] = useState({});
+    const routeFetchingRef = useRef(new Set());
     const [traffic, setTraffic] = useState([]);
     const [trafficStatus, setTrafficStatus] = useState({ state: 'off', message: '', source: '', lastUpdate: 0 });
     const trafficLgRef = useRef(null);
@@ -1022,10 +1026,40 @@ const App = () => {
         return () => { cancelled = true; if (timer) clearInterval(timer); };
     }, [liveTraffic, db.fixes]);
 
+    // Background route lookup (callsign → ORIG/DEST) via adsbdb.com
+    useEffect(() => {
+        if (!liveTraffic) return;
+        const needed = traffic
+            .map(ac => ac.callsign)
+            .filter(cs => cs && cs !== '—' && !(cs in routes) && !routeFetchingRef.current.has(cs));
+        if (!needed.length) return;
+        let cancelled = false;
+        needed.forEach(cs => {
+            routeFetchingRef.current.add(cs);
+            fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`, { cache: 'force-cache' })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (cancelled) return;
+                    const fr = data && data.response && data.response.flightroute;
+                    setRoutes(prev => ({
+                        ...prev,
+                        [cs]: fr ? { orig: fr.origin?.icao_code || '', dest: fr.destination?.icao_code || '' }
+                                 : { orig: '', dest: '' }
+                    }));
+                })
+                .catch(() => {
+                    if (cancelled) return;
+                    setRoutes(prev => ({ ...prev, [cs]: { orig: '', dest: '' } }));
+                });
+        });
+        return () => { cancelled = true; };
+    }, [traffic, liveTraffic]);
+
     // Render live traffic markers when data changes
     useEffect(() => {
         const lg = trafficLgRef.current;
-        if (!lg) return;
+        const map = fgRef.current && fgRef.current.map;
+        if (!lg || !map) return;
         lg.clearLayers();
         if (!liveTraffic) return;
 
@@ -1037,6 +1071,11 @@ const App = () => {
             const dLon = (arp[1] - ac.lon) * Math.cos(latR);
             const distNM = Math.sqrt(dLat * dLat + dLon * dLon) * 60;
             if (distNM > 80) return 'crossing';
+            // Low + descending near VHHH → inbound (handles downwind/base legs)
+            if (ac.altFt < 14000 && distNM < 60) {
+                if (ac.vsFpm < -200) return 'inbound';
+                if (ac.vsFpm > 200)  return 'outbound';
+            }
             const brg = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
             const absDiff = Math.abs(((ac.track - brg + 540) % 360) - 180);
             if (absDiff < 70) return 'inbound';
@@ -1044,14 +1083,14 @@ const App = () => {
             return 'crossing';
         };
 
+        const rendered = []; // {marker, tipHtml, priority}
+
         traffic.forEach(ac => {
             const dir = classifyDir(ac);
-            // Color by direction: inbound=yellow, outbound=blue, crossing=light gray
             const fill = dir === 'inbound'  ? '#ffd84a'
                        : dir === 'outbound' ? '#3b9eff'
                        : dir === 'ground'   ? '#6e7681'
                                             : '#e0e6ed';
-
             const rot = ac.track || 0;
             const size = ac.onGround ? 20 : 28;
 
@@ -1070,30 +1109,81 @@ const App = () => {
             });
             const marker = L.marker([ac.lat, ac.lon], { icon, keyboard: false });
 
-            const altStr = ac.onGround ? 'GND' : (ac.altFt >= 18000 ? `FL${String(Math.round(ac.altFt / 100)).padStart(3, '0')}` : `${Math.round(ac.altFt).toLocaleString()} ft`);
-            const vsIcon = ac.vsFpm > 256 ? '↑' : ac.vsFpm < -256 ? '↓' : '→';
+            const altStr   = ac.onGround ? 'GND' : (ac.altFt >= 18000 ? `FL${String(Math.round(ac.altFt / 100)).padStart(3, '0')}` : `${Math.round(ac.altFt).toLocaleString()} ft`);
+            const vsIcon   = ac.vsFpm > 256 ? '↑' : ac.vsFpm < -256 ? '↓' : '→';
             const trackStr = `${String(Math.round(ac.track)).padStart(3, '0')}°`;
-            const meta = [ac.reg, ac.type, ac.country].filter(Boolean).join(' · ');
+            const gsStr    = `${Math.round(ac.gsKts)} kt`;
+            const type     = ac.type || '—';
+            const rt       = routes[ac.callsign];
+            const orig     = (rt && rt.orig) || '----';
+            const dest     = (rt && rt.dest) || '----';
+            const cs       = ac.callsign || '—';
 
-            const tip = `
-                <div>
-                    <span class="ac-cs">${ac.callsign}</span>
-                    ${meta ? `<div class="ac-meta">${meta}</div>` : ''}
-                    <div><span class="ac-meta">ALT</span> <span class="ac-val">${altStr}</span> ${vsIcon}</div>
-                    <div><span class="ac-meta">GS</span> <span class="ac-val">${Math.round(ac.gsKts)} kt</span>
-                        &nbsp;<span class="ac-meta">TRK</span> <span class="ac-val">${trackStr}</span></div>
+            const tipHtml = `
+                <div class="ac-tip">
+                    <div class="ac-line ac-cs">${cs}</div>
+                    <div class="ac-line"><span class="ac-val">${type}</span> <span class="ac-meta">·</span> <span class="ac-val">${orig}</span><span class="ac-meta">→</span><span class="ac-val">${dest}</span></div>
+                    <div class="ac-line"><span class="ac-meta">ALT</span> <span class="ac-val">${altStr}</span> <span class="ac-val">${vsIcon}</span></div>
+                    <div class="ac-line"><span class="ac-meta">GS</span> <span class="ac-val">${gsStr}</span> &nbsp;<span class="ac-meta">TRK</span> <span class="ac-val">${trackStr}</span></div>
                 </div>
             `;
-            marker.bindTooltip(tip, {
+
+            marker.bindTooltip(tipHtml, {
                 direction: 'top',
-                offset: [0, -10],
+                offset: [0, -14],
                 className: showAcLabels ? 'ac-tooltip ac-label-pinned' : 'ac-tooltip',
                 opacity: 1,
                 permanent: showAcLabels
             });
             marker.addTo(lg);
+
+            const priority = dir === 'inbound' ? 0 : dir === 'outbound' ? 1 : dir === 'ground' ? 3 : 2;
+            rendered.push({ marker, tipHtml, priority });
         });
-    }, [traffic, liveTraffic, showAcLabels, db.fixes]);
+
+        // Label declutter — only runs when labels are pinned and declutter is on
+        const declutter = () => {
+            if (!showAcLabels) return;
+            const labelW = 128, labelH = 62;
+            if (!acLabelsDeclutter) {
+                // Restore any previously unbound labels
+                rendered.forEach(({ marker, tipHtml }) => {
+                    if (!marker.getTooltip()) {
+                        marker.bindTooltip(tipHtml, {
+                            direction: 'top', offset: [0, -14],
+                            className: 'ac-tooltip ac-label-pinned',
+                            opacity: 1, permanent: true
+                        });
+                    }
+                });
+                return;
+            }
+            const sorted = [...rendered].sort((a, b) => a.priority - b.priority);
+            const accepted = [];
+            sorted.forEach(({ marker, tipHtml }) => {
+                const pt = map.latLngToContainerPoint(marker.getLatLng());
+                const rect = { x1: pt.x - labelW/2, y1: pt.y - 14 - labelH, x2: pt.x + labelW/2, y2: pt.y - 14 };
+                const overlaps = accepted.some(r =>
+                    !(rect.x2 < r.x1 || rect.x1 > r.x2 || rect.y2 < r.y1 || rect.y1 > r.y2)
+                );
+                if (overlaps) {
+                    if (marker.getTooltip()) marker.unbindTooltip();
+                } else {
+                    accepted.push(rect);
+                    if (!marker.getTooltip()) {
+                        marker.bindTooltip(tipHtml, {
+                            direction: 'top', offset: [0, -14],
+                            className: 'ac-tooltip ac-label-pinned',
+                            opacity: 1, permanent: true
+                        });
+                    }
+                }
+            });
+        };
+        declutter();
+        map.on('moveend zoomend', declutter);
+        return () => { map.off('moveend zoomend', declutter); };
+    }, [traffic, liveTraffic, showAcLabels, acLabelsDeclutter, routes, db.fixes]);
 
     // ── Main Map Rendering Logic (Procedures & Declutter) ───────────────────
     useEffect(() => {
@@ -1901,6 +1991,12 @@ const App = () => {
                                     <button className={`toggle-btn ${showAcLabels ? 'active' : ''}`} onClick={() => setShowAcLabels(v => !v)} style={{flex: 1}}>
                                         {showAcLabels ? '● AC LABELS ON' : '○ AC LABELS'}
                                     </button>
+                                    {showAcLabels && (
+                                        <button className={`toggle-btn ${acLabelsDeclutter ? 'active' : ''}`} onClick={() => setAcLabelsDeclutter(v => !v)} style={{flex: 1}}
+                                            title="Hide aircraft labels that overlap each other (markers stay visible)">
+                                            {acLabelsDeclutter ? '◎ DECLUTTER' : '○ DECLUTTER'}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
