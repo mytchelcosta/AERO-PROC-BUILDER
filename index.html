@@ -1211,13 +1211,18 @@ const App = () => {
         const arp = db.fixes["VHHH"] || [22.3089, 113.9146];
         const classifyDir = (ac) => {
             if (ac.onGround) return 'ground';
+            // Primary: trust the flight-route lookup (origin / destination ICAO)
+            const rt = routes[ac.callsign];
+            if (rt && (rt.orig || rt.dest)) {
+                if (rt.dest === 'VHHH') return 'inbound';
+                if (rt.orig === 'VHHH') return 'outbound';
+                return 'crossing';
+            }
+            // Fallback (route unknown yet): tight heuristic — near + climbing/descending.
             const latR = ac.lat * Math.PI / 180;
             const dLat = arp[0] - ac.lat;
             const dLon = (arp[1] - ac.lon) * Math.cos(latR);
             const distNM = Math.sqrt(dLat * dLat + dLon * dLon) * 60;
-            // Only aircraft that are BOTH near VHHH AND changing altitude decisively
-            // count as arrivals / departures. Everything else (cruise overflights,
-            // aircraft handled by neighbouring FIRs, etc.) is 'crossing'.
             if (distNM > 60) return 'crossing';
             if (ac.altFt > 16000 && Math.abs(ac.vsFpm) < 500) return 'crossing';
             if (ac.altFt < 14000 && ac.vsFpm < -200) return 'inbound';
